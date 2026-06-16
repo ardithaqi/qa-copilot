@@ -246,7 +246,7 @@ export function buildEvaluationMarkdown(
     originalWorkItem,
     "",
     `- **Coverage (final):** ${evaluation.coveragePercent}%`,
-    `- **Coverage (base score):** ${evaluation.llmCoverageMedian}%`,
+    `- **Coverage (base score):** ${evaluation.coverageBaseScore}%`,
     `- **Coverage (average):** ${evaluation.scores.coverageAverage}%`,
     `- **Coverage range:** ${evaluation.scores.coverageMin}–${evaluation.scores.coverageMax}`,
     `- **Missing areas adjustment:** −${evaluation.hardCheckPenalty}`,

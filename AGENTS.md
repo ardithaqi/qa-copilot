@@ -124,7 +124,10 @@ Coverage score + feedback
 
 - **`src/lib/evaluation/`** — evaluator prompts, 2 parallel LLM passes (temp 0.1), median/average aggregation, hard checks
 - **Input contract** — evaluator receives `originalWorkItem` (user ticket only) + serialized analyzer output; prompts never appear in the report
-- **Rubric** — accuracy/coverage/quality derived from issue counts in `evaluator-prompt.ts` (not free-form guessing)  
+- **Rubric** — scores computed server-side in `compute-evaluation-scores.ts` from merged findings (not LLM-reported numbers)  
+- **Coverage** — `100 − 10 × coverageAreaGaps` + hard-check penalty  
+- **Accuracy** — `100 − 12 × accuracyIssues`  
+- **Quality** — `100 − 8 × qualityIssues + min(10, strengths × 2)` — coverage gaps do not affect quality  
 - **Coverage area gaps** — category-based (`validation`, `api`, `edge`, `persistence`, etc.) via `coverage-areas.ts`  
 - **Coverage breakdown** — evaluator returns `coverageTheme` + `coverageBreakdown` with labels derived from the work item workflow (same dynamic approach as the theme); hard checks adjust score only  
 - **Theme checks** — `hard-checks.ts`; −5 **coverage** per missing theme (not quality)  
@@ -522,5 +525,5 @@ Use this section for future work; remove items when done and note in Changelog.
 | 2026-06-16 | **Analyzer/evaluator split:** coverage-driven generator; evaluator reports coverage areas + accuracy/quality issues. |
 | 2026-06-16 | **Evaluation:** split accuracy vs coverage in AI quality evaluation output. |
 | 2026-06-16 | **Generator prompt:** require more edge-case coverage for async/event-driven inputs in Analyze output. |
-| 2026-06-16 | **Coverage breakdown:** merge coverage area gaps into missing list; hide duplicate gaps section; dedupe improvement suggestions. |
+| 2026-06-16 | **Evaluation scores:** computed server-side from findings arrays; LLM-reported scores are debug-only. |
 | 2026-06-16 | **Evaluator:** flag duplication/over-automation as quality issues; do not flag correct reproduction expected results as vague. |

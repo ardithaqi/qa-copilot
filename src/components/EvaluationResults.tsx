@@ -149,7 +149,7 @@ export default function EvaluationResults({
             <p className="text-xs tabular-nums">
               {coverageAdjusted ? (
                 <>
-                  Base score {evaluation.llmCoverageMedian}% · Missing areas −
+                  Base score {evaluation.coverageBaseScore}% · Missing areas −
                   {evaluation.hardCheckPenalty}
                 </>
               ) : (

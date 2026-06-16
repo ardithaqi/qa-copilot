@@ -1,12 +1,19 @@
 import {
   HARD_CHECK_PENALTY_PER_FAILURE,
 } from "@/lib/evaluation/constants";
+import {
+  computeAccuracyScore,
+  computeCoverageBaseScore,
+  computeCoverageBaseScoreFromGaps,
+  computeQualityScore,
+} from "@/lib/evaluation/compute-evaluation-scores";
 import type { CoverageAreaGap } from "@/lib/evaluation/coverage-areas";
 import { COVERAGE_AREA_IDS } from "@/lib/evaluation/coverage-areas";
 import {
   countFailedHardCheckCriteria,
   runHardChecks,
 } from "@/lib/evaluation/hard-checks";
+import { unionUniqueSimilarStrings } from "@/lib/evaluation/text-similarity";
 import type {
   CoverageBreakdown,
   CoverageBreakdownMissingItem,
@@ -35,6 +42,14 @@ function average(values: number[]): number {
   return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
 }
 
+function medianOptional(values: Array<number | undefined>): number | undefined {
+  const defined = values.filter((value): value is number => value !== undefined);
+  if (defined.length === 0) {
+    return undefined;
+  }
+  return median(defined);
+}
+
 function unionUniqueStrings(arrays: string[][]): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
@@ -47,65 +62,6 @@ function unionUniqueStrings(arrays: string[][]): string[] {
       }
       seen.add(key);
       result.push(item);
-    }
-  }
-
-  return result;
-}
-
-function tokenSet(text: string): Set<string> {
-  return new Set(
-    text
-      .toLowerCase()
-      .replace(/[^\w\s]/g, " ")
-      .split(/\s+/)
-      .filter((word) => word.length > 3)
-  );
-}
-
-function areSimilarSuggestions(a: string, b: string): boolean {
-  const na = a.toLowerCase().trim();
-  const nb = b.toLowerCase().trim();
-  if (!na || !nb) {
-    return false;
-  }
-  if (na === nb) {
-    return true;
-  }
-  if (na.includes(nb) || nb.includes(na)) {
-    return true;
-  }
-
-  const wordsA = tokenSet(na);
-  const wordsB = tokenSet(nb);
-  if (wordsA.size === 0 || wordsB.size === 0) {
-    return false;
-  }
-
-  let intersection = 0;
-  for (const word of wordsA) {
-    if (wordsB.has(word)) {
-      intersection += 1;
-    }
-  }
-
-  const union = new Set([...wordsA, ...wordsB]).size;
-  return intersection / union >= 0.55;
-}
-
-function unionUniqueSimilarStrings(arrays: string[][]): string[] {
-  const result: string[] = [];
-
-  for (const array of arrays) {
-    for (const item of array) {
-      const trimmed = item.trim();
-      if (!trimmed) {
-        continue;
-      }
-      if (result.some((existing) => areSimilarSuggestions(existing, trimmed))) {
-        continue;
-      }
-      result.push(trimmed);
     }
   }
 
@@ -195,10 +151,16 @@ function pickRepresentativeSummary(
   targetQuality: number
 ): string {
   let best = runs[0];
-  let bestDistance = Math.abs(best.qualityScore - targetQuality);
+  let bestDistance = Math.abs(
+    computeQualityScore(best.qualityIssues.length, best.strengths.length) -
+      targetQuality
+  );
 
   for (const run of runs.slice(1)) {
-    const distance = Math.abs(run.qualityScore - targetQuality);
+    const distance = Math.abs(
+      computeQualityScore(run.qualityIssues.length, run.strengths.length) -
+        targetQuality
+    );
     if (distance < bestDistance) {
       best = run;
       bestDistance = distance;
@@ -209,12 +171,12 @@ function pickRepresentativeSummary(
 }
 
 function applyHardCheckPenaltyToCoverage(
-  llmCoverageMedian: number,
+  coverageBaseScore: number,
   hardChecks: HardCheckResult[]
 ): { coveragePercent: number; hardCheckPenalty: number } {
   const failedCriteria = countFailedHardCheckCriteria(hardChecks);
   const hardCheckPenalty = failedCriteria * HARD_CHECK_PENALTY_PER_FAILURE;
-  const coveragePercent = Math.max(0, llmCoverageMedian - hardCheckPenalty);
+  const coveragePercent = Math.max(0, coverageBaseScore - hardCheckPenalty);
   return { coveragePercent, hardCheckPenalty };
 }
 
@@ -320,53 +282,77 @@ function mergeGapLists(
   return consistent.length > 0 ? consistent : unionUniqueStrings(runs.map(picker));
 }
 
+function perRunCoverageScores(runs: LlmEvaluationRun[]): number[] {
+  return runs.map((run) => computeCoverageBaseScore(run.coverageAreaGaps.length));
+}
+
+function perRunAccuracyScores(runs: LlmEvaluationRun[]): number[] {
+  return runs.map((run) => computeAccuracyScore(run.accuracyIssues.length));
+}
+
+function perRunQualityScores(runs: LlmEvaluationRun[]): number[] {
+  return runs.map((run) =>
+    computeQualityScore(run.qualityIssues.length, run.strengths.length)
+  );
+}
+
 export function aggregateEvaluationRuns(
   runs: LlmEvaluationRun[],
   originalWorkItem: string,
   analysis: QAAnalysis
 ): EvaluationResult {
-  const coverages = runs.map((run) => run.coveragePercent);
-  const accuracies = runs.map((run) => run.accuracyScore);
-  const qualities = runs.map((run) => run.qualityScore);
-  const llmCoverageMedian = median(coverages);
-  const qualityMedian = median(qualities);
-  const accuracyMedian = median(accuracies);
+  const coverageAreaGaps = mergeCoverageAreaGaps(runs);
+  const accuracyIssues = mergeGapLists(runs, (run) => run.accuracyIssues);
+  const qualityIssues = mergeGapLists(runs, (run) => run.qualityIssues);
+  const strengths = unionUniqueSimilarStrings(runs.map((run) => run.strengths));
+  const improvementSuggestions = unionUniqueSimilarStrings(
+    runs.map((run) => run.improvementSuggestions)
+  );
+
+  const coverageBaseScore = computeCoverageBaseScoreFromGaps(coverageAreaGaps);
+  const accuracyScore = computeAccuracyScore(accuracyIssues.length);
+  const qualityScore = computeQualityScore(qualityIssues.length, strengths.length);
+
   const hardChecks = runHardChecks(originalWorkItem, analysis);
   const { coveragePercent, hardCheckPenalty } = applyHardCheckPenaltyToCoverage(
-    llmCoverageMedian,
+    coverageBaseScore,
     hardChecks
   );
 
+  const runCoverages = perRunCoverageScores(runs);
+  const runAccuracies = perRunAccuracyScores(runs);
+  const runQualities = perRunQualityScores(runs);
+
   return {
-    coveragePercent,
-    llmCoverageMedian,
-    accuracyScore: accuracyMedian,
-    qualityScore: qualityMedian,
-    llmQualityMedian: qualityMedian,
-    summary: pickRepresentativeSummary(runs, qualityMedian),
+    summary: pickRepresentativeSummary(runs, qualityScore),
     coverageTheme: pickCoverageTheme(runs),
     coverageBreakdown: mergeCoverageBreakdown(runs),
-    coverageAreaGaps: mergeCoverageAreaGaps(runs),
-    accuracyIssues: mergeGapLists(runs, (run) => run.accuracyIssues),
-    qualityIssues: mergeGapLists(runs, (run) => run.qualityIssues),
-    strengths: unionUniqueStrings(runs.map((run) => run.strengths)),
-    improvementSuggestions: unionUniqueSimilarStrings(
-      runs.map((run) => run.improvementSuggestions)
-    ),
+    coverageAreaGaps,
+    accuracyIssues,
+    qualityIssues,
+    strengths,
+    improvementSuggestions,
+    coveragePercent,
+    coverageBaseScore,
+    accuracyScore,
+    qualityScore,
+    llmCoverageMedian: medianOptional(runs.map((run) => run.llmReportedCoverage)),
+    llmAccuracyMedian: medianOptional(runs.map((run) => run.llmReportedAccuracy)),
+    llmQualityMedian: medianOptional(runs.map((run) => run.llmReportedQuality)),
     scores: {
       evaluationRuns: runs.length,
-      coverageMedian: llmCoverageMedian,
-      coverageAverage: average(coverages),
-      coverageMin: Math.min(...coverages),
-      coverageMax: Math.max(...coverages),
-      accuracyMedian,
-      accuracyAverage: average(accuracies),
-      accuracyMin: Math.min(...accuracies),
-      accuracyMax: Math.max(...accuracies),
-      qualityMedian,
-      qualityAverage: average(qualities),
-      qualityMin: Math.min(...qualities),
-      qualityMax: Math.max(...qualities),
+      coverageMedian: median(runCoverages),
+      coverageAverage: average(runCoverages),
+      coverageMin: Math.min(...runCoverages),
+      coverageMax: Math.max(...runCoverages),
+      accuracyMedian: median(runAccuracies),
+      accuracyAverage: average(runAccuracies),
+      accuracyMin: Math.min(...runAccuracies),
+      accuracyMax: Math.max(...runAccuracies),
+      qualityMedian: median(runQualities),
+      qualityAverage: average(runQualities),
+      qualityMin: Math.min(...runQualities),
+      qualityMax: Math.max(...runQualities),
     },
     hardChecks,
     hardCheckPenalty,

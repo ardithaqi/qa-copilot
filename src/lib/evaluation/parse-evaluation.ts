@@ -9,13 +9,17 @@ import type {
   CoverageBreakdownMissingItem,
   LlmEvaluationRun,
 } from "@/lib/evaluation/types";
+import { clampScore } from "@/lib/evaluation/compute-evaluation-scores";
 
-function clampScore(value: unknown): number {
+function optionalScore(value: unknown): number | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
   const num = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(num)) {
-    return 0;
+    return undefined;
   }
-  return Math.max(0, Math.min(100, Math.round(num)));
+  return clampScore(num);
 }
 
 function stringArray(value: unknown): string[] {
@@ -240,10 +244,6 @@ export function parseEvaluationResponse(raw: string): LlmEvaluationRun {
   const data = parsed as Record<string, unknown>;
 
   return {
-    coveragePercent: clampScore(data.coveragePercent),
-    accuracyScore:
-      data.accuracyScore === undefined ? 100 : clampScore(data.accuracyScore),
-    qualityScore: clampScore(data.qualityScore),
     summary: firstString(data.summary, "No summary provided."),
     coverageTheme: parseCoverageTheme(data),
     coverageBreakdown: parseCoverageBreakdown(data),
@@ -252,5 +252,8 @@ export function parseEvaluationResponse(raw: string): LlmEvaluationRun {
     qualityIssues: stringArray(data.qualityIssues),
     strengths: stringArray(data.strengths),
     improvementSuggestions: stringArray(data.improvementSuggestions),
+    llmReportedCoverage: optionalScore(data.coveragePercent),
+    llmReportedAccuracy: optionalScore(data.accuracyScore),
+    llmReportedQuality: optionalScore(data.qualityScore),
   };
 }

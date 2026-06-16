@@ -124,11 +124,19 @@ Reviewer feedback on **coverage themes** and Analyzer behavior — never test sc
 
 Do NOT repeat topics already in coverageBreakdown.missing. Do NOT submit near-duplicate suggestions (merge overlapping advice into one item).
 
-## Scoring rubric (apply after listing all arrays)
+## Scoring (server-side — do not compute final scores)
 
-1. coveragePercent = 100 − (10 × coverageAreaGaps.length). Clamp 0–100. Count each gap object once (max one gap per area id preferred).
-2. accuracyScore = 100 − (12 × accuracyIssues.length). Clamp 0–100.
-3. qualityScore = 100 − (8 × qualityIssues.length) + min(10, strengths.length × 2). Clamp 0–100.
+Return structured findings only. The application computes Coverage, Accuracy, and Quality from your arrays using a fixed rubric:
+
+- **Coverage** — from coverageAreaGaps count (+ deterministic hard checks on the analysis)
+- **Accuracy** — from accuracyIssues count only
+- **Quality** — from qualityIssues and strengths only (coverage gaps must NOT reduce quality)
+
+Optional numeric fields coveragePercent, accuracyScore, and qualityScore in JSON are ignored for display (debug metadata only if present).
+
+When filling arrays:
+- Put missing coverage only in coverageAreaGaps and coverageBreakdown.missing — never in qualityIssues or accuracyIssues unless faithfulness-related.
+- qualityIssues = vagueness, duplication, over-automation, poor readability — not missing test scenarios.
 
 Return a single JSON object only — no markdown fences, no commentary outside JSON.`;
 }
@@ -151,15 +159,12 @@ ${generatedOutput}
 2. Set coverageTheme and coverageBreakdown by deriving labels from **this** work item's workflow — same dynamic approach as the theme title, not a reusable checklist.
 3. List coverageAreaGaps for weak or missing coverage **categories** only.
 4. List accuracyIssues only for faithfulness problems.
-5. List qualityIssues only for genuine vagueness, duplication, or usefulness problems — NEVER for reproduction cases whose expectedResult already states observable outcomes including refresh/persistence when relevant.
-6. Apply the scoring rubric.
+5. List qualityIssues only for genuine vagueness, duplication, or usefulness problems — NEVER for reproduction cases whose expectedResult already states observable outcomes including refresh/persistence when relevant. NEVER list missing coverage as a quality issue.
+6. Return structured findings; the server computes scores from your arrays.
 
 Return JSON with exactly these keys (derive coverageTheme and coverageBreakdown from the Original work item and Generated QA output above — do not copy placeholder text):
 
 {
-  "coveragePercent": 0,
-  "accuracyScore": 0,
-  "qualityScore": 0,
   "summary": "2-4 sentence overall assessment",
   "coverageTheme": "",
   "coverageBreakdown": {
@@ -167,9 +172,9 @@ Return JSON with exactly these keys (derive coverageTheme and coverageBreakdown 
     "missing": []
   },
   "coverageAreaGaps": [],
-  "accuracyIssues": ["unsupported or invented claims only"],
-  "qualityIssues": ["usefulness problems in the existing output only"],
-  "strengths": ["what the output did well"],
-  "improvementSuggestions": ["reviewer feedback on coverage themes — not test scripts"]
+  "accuracyIssues": [],
+  "qualityIssues": [],
+  "strengths": [],
+  "improvementSuggestions": []
 }`;
 }

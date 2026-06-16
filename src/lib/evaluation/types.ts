@@ -18,9 +18,6 @@ export interface CoverageBreakdown {
 }
 
 export interface LlmEvaluationRun {
-  coveragePercent: number;
-  accuracyScore: number;
-  qualityScore: number;
   summary: string;
   /** Business workflow name for coverage breakdown title (e.g. "Profile update"). */
   coverageTheme: string;
@@ -30,6 +27,10 @@ export interface LlmEvaluationRun {
   qualityIssues: string[];
   strengths: string[];
   improvementSuggestions: string[];
+  /** Raw scores from LLM JSON when present — debug only; not used for displayed score. */
+  llmReportedCoverage?: number;
+  llmReportedAccuracy?: number;
+  llmReportedQuality?: number;
 }
 
 export interface EvaluationScoreStats {
@@ -60,12 +61,25 @@ export interface HardCheckResult {
   criteria: HardCheckCriterionResult[];
 }
 
-export interface EvaluationResult extends LlmEvaluationRun {
+export interface EvaluationResult {
+  summary: string;
+  coverageTheme: string;
+  coverageBreakdown: CoverageBreakdown;
+  coverageAreaGaps: CoverageAreaGap[];
+  accuracyIssues: string[];
+  qualityIssues: string[];
+  strengths: string[];
+  improvementSuggestions: string[];
+  /** Final coverage after hard-check penalty. */
   coveragePercent: number;
+  /** Coverage from merged gaps before hard-check penalty. */
+  coverageBaseScore: number;
   accuracyScore: number;
   qualityScore: number;
-  llmQualityMedian: number;
-  llmCoverageMedian: number;
+  /** Median of raw LLM-reported scores across runs — debug metadata only. */
+  llmCoverageMedian?: number;
+  llmAccuracyMedian?: number;
+  llmQualityMedian?: number;
   scores: EvaluationScoreStats;
   hardChecks: HardCheckResult[];
   hardCheckPenalty: number;
