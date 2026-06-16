@@ -12,6 +12,7 @@ apiTestSuggestions when persistence or server round-trips are implied.`,
 Apply SAVE_PERSIST_BUG_FLOOR when the bug involves save/update/persist failure — minimum 6–8 distinct manual cases, not 3–4.
 First case MUST reproduce (reproduction). expectedResult = observable correct behavior; bug observation in steps.
 Include: happy path + refresh, invalid input, empty required, server/API failure, network/timeout failure, apiTestSuggestions.
+When ticket reports silent failure or missing confirmation: extend happy path expectedResult to include visible success confirmation or appropriate error — do not add a separate feedback-only case.
 automationCandidates: minimum 4 for save/persist bugs (UI happy/repro, validation, mocked failure, API or session persistence).
 Avoid duplicate refresh-only cases. Do not invent root causes.`,
 

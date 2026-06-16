@@ -52,7 +52,7 @@ Additional tests should exist only when they verify a **meaningfully different**
 
 Merge related checks when appropriate:
 - Successful save + persistence after refresh can be one happy_path case.
-- Success feedback (confirmation/toast) can be included in the save case or be a separate case only when feedback verification is a distinct concern.
+- When the ticket reports silent failure or missing confirmation, extend the **happy path** expectedResult to include visible success confirmation (or appropriate error if save fails) — do not add a separate case only for feedback.
 `;
 
 export const BUG_COVERAGE_RULES = `
@@ -81,7 +81,7 @@ export const SAVE_PERSIST_BUG_FLOOR = `
 When a bug describes failure to save, update, or persist data (value not sticking, profile not updating, silent save failure), include **at least** these distinct manual test cases. No duplicate refresh-only cases, but **do not stop at 3–4 total**.
 
 1. **Reproduction** (first, category reproduction) — observable correct expectedResult tied to the defect (see bug rules).
-2. **Happy path** — successful save with persistence verified after page refresh (one case; include refresh in steps).
+2. **Happy path** — successful save with persistence verified after page refresh (one case; include refresh in steps). When the ticket reports silent failure, no confirmation, or no error shown after save, extend expectedResult to also require visible user feedback, e.g. persistence after refresh **and** a success confirmation is shown (or an appropriate error if save fails) — without inventing exact message text.
 3. **Invalid input** negative — reject bad format with user-visible feedback.
 4. **Empty / required field** negative — when the field is implied required.
 5. **Server or API failure** negative — error handling when save round-trip fails (use TODO for unknown endpoints).
@@ -91,9 +91,8 @@ Add when they add **unique** value (not duplicates of the above):
 - Persistence after re-login or navigate away/back (session-bound data)
 - Rapid repeat submit / double-click (edge) — when save/submit is involved
 - Regression on adjacent profile fields
-- Success confirmation/toast (happy_path or other) — only when ticket implies user feedback or silent failure
 
-**apiTestSuggestions** — mandatory with TODO placeholders.
+**apiTestSuggestions** — mandatory with TODO placeholders (include GET-after-write persistence verify when save implies server round-trip).
 
 **automationCandidates** — at least **4** for non-trivial save/persist bugs:
 - Reproduction or happy path with refresh (UI, High)

@@ -521,5 +521,5 @@ Use this section for future work; remove items when done and note in Changelog.
 | 2026-06-16 | **Analyzer/evaluator split:** coverage-driven generator; evaluator reports coverage areas + accuracy/quality issues. |
 | 2026-06-16 | **Evaluation:** split accuracy vs coverage in AI quality evaluation output. |
 | 2026-06-16 | **Generator prompt:** require more edge-case coverage for async/event-driven inputs in Analyze output. |
-| 2026-06-16 | **Save/persist bug floor:** 6–8 manual + 4 automation minimum; evaluator forbids false reproduction quality flags; hard checks = 3 themes only. |
+| 2026-06-16 | **Save/persist bugs:** extend happy path expectedResult with feedback when ticket reports silent failure (no separate other case). |
 | 2026-06-16 | **Evaluator:** flag duplication/over-automation as quality issues; do not flag correct reproduction expected results as vague. |
