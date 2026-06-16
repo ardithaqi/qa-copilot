@@ -4,7 +4,11 @@ import {
   type CoverageAreaGap,
   type CoverageAreaId,
 } from "@/lib/evaluation/coverage-areas";
-import type { LlmEvaluationRun } from "@/lib/evaluation/types";
+import type {
+  CoverageBreakdown,
+  CoverageBreakdownMissingItem,
+  LlmEvaluationRun,
+} from "@/lib/evaluation/types";
 
 function clampScore(value: unknown): number {
   const num = typeof value === "number" ? value : Number(value);
@@ -25,6 +29,82 @@ function stringArray(value: unknown): string[] {
 
 function firstString(value: unknown, fallback = ""): string {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
+
+const BLOCKED_COVERAGE_THEMES =
+  /^(save\s*\/\s*update|save\s*update|save\s*\/\s*update\s*\/\s*persist|crud|form|api|rabbitmq|kafka|message queue)$/i;
+
+export function sanitizeCoverageTheme(raw: string): string {
+  let theme = raw.trim().replace(/\s+coverage$/i, "").trim();
+  if (!theme || BLOCKED_COVERAGE_THEMES.test(theme)) {
+    return "";
+  }
+  if (theme.length > 80) {
+    theme = theme.slice(0, 80).trim();
+  }
+  return theme;
+}
+
+function parseMissingItems(raw: unknown): CoverageBreakdownMissingItem[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  const items: CoverageBreakdownMissingItem[] = [];
+  for (const entry of raw) {
+    if (typeof entry === "string" && entry.trim()) {
+      items.push({ label: entry.trim(), note: "" });
+      continue;
+    }
+    if (!entry || typeof entry !== "object") {
+      continue;
+    }
+    const record = entry as Record<string, unknown>;
+    const label = firstString(record.label);
+    if (!label) {
+      continue;
+    }
+    items.push({
+      label,
+      note: firstString(record.note),
+    });
+  }
+  return items;
+}
+
+function parseCoverageBreakdown(data: Record<string, unknown>): CoverageBreakdown {
+  const raw = data.coverageBreakdown;
+  if (!raw || typeof raw !== "object") {
+    return { covered: [], missing: [] };
+  }
+
+  const record = raw as Record<string, unknown>;
+  const coveredRaw = record.covered;
+  const covered: string[] = [];
+
+  if (Array.isArray(coveredRaw)) {
+    for (const entry of coveredRaw) {
+      if (typeof entry === "string" && entry.trim()) {
+        covered.push(entry.trim());
+        continue;
+      }
+      if (entry && typeof entry === "object") {
+        const label = firstString((entry as Record<string, unknown>).label);
+        if (label) {
+          covered.push(label);
+        }
+      }
+    }
+  }
+
+  return {
+    covered,
+    missing: parseMissingItems(record.missing),
+  };
+}
+
+function parseCoverageTheme(data: Record<string, unknown>): string {
+  return sanitizeCoverageTheme(firstString(data.coverageTheme));
 }
 
 function parseCoverageAreaGaps(raw: unknown): CoverageAreaGap[] {
@@ -165,6 +245,8 @@ export function parseEvaluationResponse(raw: string): LlmEvaluationRun {
       data.accuracyScore === undefined ? 100 : clampScore(data.accuracyScore),
     qualityScore: clampScore(data.qualityScore),
     summary: firstString(data.summary, "No summary provided."),
+    coverageTheme: parseCoverageTheme(data),
+    coverageBreakdown: parseCoverageBreakdown(data),
     coverageAreaGaps: pickCoverageAreaGaps(data),
     accuracyIssues: stringArray(data.accuracyIssues),
     qualityIssues: stringArray(data.qualityIssues),

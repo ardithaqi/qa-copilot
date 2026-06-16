@@ -7,11 +7,24 @@ import type { QAAnalysis } from "@/types/qa-analysis";
 export type { CoverageAreaGap };
 export type { CoverageAreaId } from "@/lib/evaluation/coverage-areas";
 
+export interface CoverageBreakdownMissingItem {
+  label: string;
+  note: string;
+}
+
+export interface CoverageBreakdown {
+  covered: string[];
+  missing: CoverageBreakdownMissingItem[];
+}
+
 export interface LlmEvaluationRun {
   coveragePercent: number;
   accuracyScore: number;
   qualityScore: number;
   summary: string;
+  /** Business workflow name for coverage breakdown title (e.g. "Profile update"). */
+  coverageTheme: string;
+  coverageBreakdown: CoverageBreakdown;
   coverageAreaGaps: CoverageAreaGap[];
   accuracyIssues: string[];
   qualityIssues: string[];

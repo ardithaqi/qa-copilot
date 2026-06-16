@@ -101,6 +101,21 @@ Do not reward or demand hallucinated precision.
 
 Reviewer feedback on **coverage themes** and Analyzer behavior — never test scripts, step lists, or "add test case X".
 
+## Coverage breakdown (mandatory)
+
+Derive the dominant **business workflow** from the original work item (title, acceptance criteria, description, architecture). This drives the user-facing Coverage breakdown panel.
+
+**coverageTheme** — 2–5 words, business capability name only. Do NOT append "coverage".
+- Good: "Profile update", "Device synchronization", "Authentication", "Report generation", "OTA deployment"
+- Bad: "Save / update / persist", "CRUD", "Form", "RabbitMQ", "API" — unless the ticket is explicitly about that technical concern
+- Fallback when unclear: "Feature" or "Workflow"
+
+**coverageBreakdown** — workflow-specific areas assessed against the **generated output** (not invented test cases):
+- **covered** — short labels for workflow areas already addressed in the generated test design (e.g. "Success flow", "Event publication", "Idempotency", "Validation")
+- **missing** — { "label", "note" } for workflow areas relevant to the ticket but weak or absent. "note" is one sentence explaining the gap — no steps, no prescribed tests.
+
+Base covered/missing on what the Analyzer actually produced vs what the ticket's workflow requires. Labels must match the ticket domain (auth ticket → "Session creation"; sync ticket → "Event consumption"; profile bug → "Persistence").
+
 ## Scoring rubric (apply after listing all arrays)
 
 1. coveragePercent = 100 − (10 × coverageAreaGaps.length). Clamp 0–100. Count each gap object once (max one gap per area id preferred).
@@ -137,6 +152,13 @@ Return JSON with exactly these keys:
   "accuracyScore": 0,
   "qualityScore": 0,
   "summary": "2-4 sentence overall assessment",
+  "coverageTheme": "Profile update",
+  "coverageBreakdown": {
+    "covered": ["Success flow", "Persistence", "Validation"],
+    "missing": [
+      { "label": "Backend/API validation", "note": "Backend persistence is not verified in the test design." }
+    ]
+  },
   "coverageAreaGaps": [
     { "area": "api", "note": "API verification coverage appears limited." }
   ],
