@@ -5,7 +5,6 @@ import {
 } from "@/lib/report-display";
 import type { EvaluationResult } from "@/lib/evaluation/types";
 import { buildCoverageBreakdown } from "@/lib/evaluation/coverage-breakdown";
-import { COVERAGE_AREA_LABELS } from "@/lib/evaluation/coverage-areas";
 import type { QAAnalysis, QATestCase } from "@/types/qa-analysis";
 import { formatTestCaseCategory } from "@/types/qa-analysis";
 import {
@@ -286,14 +285,6 @@ export function buildEvaluationMarkdown(
         lines.push("");
       }
     }
-  }
-
-  if (evaluation.coverageAreaGaps.length > 0) {
-    lines.push("## Coverage area gaps", "");
-    for (const gap of evaluation.coverageAreaGaps) {
-      lines.push(`- **${COVERAGE_AREA_LABELS[gap.area]}**: ${gap.note}`);
-    }
-    lines.push("");
   }
 
   lines.push(

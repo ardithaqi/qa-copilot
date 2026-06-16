@@ -97,24 +97,32 @@ Good quality issue: "Save + refresh persistence appears covered twice with overl
 
 Do not reward or demand hallucinated precision.
 
+## Coverage breakdown (mandatory)
+
+Use the **same derivation approach for labels as for coverageTheme** — read the original work item, identify the dominant business workflow, then name the meaningful areas within that workflow. No fixed label vocabulary across tickets.
+
+**coverageTheme** — 2–5 words, business capability name only. Do NOT append "coverage".
+- Prefer business capability names over technical implementation (same rules as theme — avoid "CRUD", "API", "RabbitMQ" unless the ticket is explicitly about those)
+- Fallback when unclear: "Feature" or "Workflow"
+
+**coverageBreakdown** — assess the **generated output** against workflow areas implied by **this** work item:
+
+1. From the work item (title, acceptance criteria, description, architecture), determine what capability areas a thorough test design for **this ticket** should address.
+2. Compare those areas to what the generated QA output actually covers.
+3. **covered** — short labels (2–5 words) for workflow areas already addressed in the output
+4. **missing** — { "label", "note" } for workflow areas relevant to the ticket but weak or absent. "note" is one sentence — no steps, no prescribed tests.
+
+**Sync with coverageAreaGaps (critical):** every entry in coverageAreaGaps MUST have a matching entry in coverageBreakdown.missing with a **workflow-specific label** (not the generic area name like "API coverage"). The breakdown panel is the user-facing view; gaps drive the score. They must agree — if you flag api in coverageAreaGaps, include the corresponding gap in coverageBreakdown.missing (e.g. for a filter bug: "Search filter API alignment", not "API verification").
+
+**Label quality test:** each label must be specific to this ticket. If the same label would fit most unrelated tickets unchanged, it is too generic — replace it with a capability name from this work item's workflow (same standard you use when naming coverageTheme).
+
+Do NOT reuse a standard checklist across different ticket types.
+
 ## improvementSuggestions
 
 Reviewer feedback on **coverage themes** and Analyzer behavior — never test scripts, step lists, or "add test case X".
 
-## Coverage breakdown (mandatory)
-
-Derive the dominant **business workflow** from the original work item (title, acceptance criteria, description, architecture). This drives the user-facing Coverage breakdown panel.
-
-**coverageTheme** — 2–5 words, business capability name only. Do NOT append "coverage".
-- Good: "Profile update", "Device synchronization", "Authentication", "Report generation", "OTA deployment"
-- Bad: "Save / update / persist", "CRUD", "Form", "RabbitMQ", "API" — unless the ticket is explicitly about that technical concern
-- Fallback when unclear: "Feature" or "Workflow"
-
-**coverageBreakdown** — workflow-specific areas assessed against the **generated output** (not invented test cases):
-- **covered** — short labels for workflow areas already addressed in the generated test design (e.g. "Success flow", "Event publication", "Idempotency", "Validation")
-- **missing** — { "label", "note" } for workflow areas relevant to the ticket but weak or absent. "note" is one sentence explaining the gap — no steps, no prescribed tests.
-
-Base covered/missing on what the Analyzer actually produced vs what the ticket's workflow requires. Labels must match the ticket domain (auth ticket → "Session creation"; sync ticket → "Event consumption"; profile bug → "Persistence").
+Do NOT repeat topics already in coverageBreakdown.missing. Do NOT submit near-duplicate suggestions (merge overlapping advice into one item).
 
 ## Scoring rubric (apply after listing all arrays)
 
@@ -140,28 +148,25 @@ ${generatedOutput}
 ## Your task
 
 1. Review the generated output against the original work item only (not analyzer or evaluator instructions).
-2. List coverageAreaGaps for weak or missing coverage **categories** only.
-3. List accuracyIssues only for faithfulness problems.
-4. List qualityIssues only for genuine vagueness, duplication, or usefulness problems — NEVER for reproduction cases whose expectedResult already states observable outcomes including refresh/persistence when relevant.
-5. Apply the scoring rubric.
+2. Set coverageTheme and coverageBreakdown by deriving labels from **this** work item's workflow — same dynamic approach as the theme title, not a reusable checklist.
+3. List coverageAreaGaps for weak or missing coverage **categories** only.
+4. List accuracyIssues only for faithfulness problems.
+5. List qualityIssues only for genuine vagueness, duplication, or usefulness problems — NEVER for reproduction cases whose expectedResult already states observable outcomes including refresh/persistence when relevant.
+6. Apply the scoring rubric.
 
-Return JSON with exactly these keys:
+Return JSON with exactly these keys (derive coverageTheme and coverageBreakdown from the Original work item and Generated QA output above — do not copy placeholder text):
 
 {
   "coveragePercent": 0,
   "accuracyScore": 0,
   "qualityScore": 0,
   "summary": "2-4 sentence overall assessment",
-  "coverageTheme": "Profile update",
+  "coverageTheme": "",
   "coverageBreakdown": {
-    "covered": ["Success flow", "Persistence", "Validation"],
-    "missing": [
-      { "label": "Backend/API validation", "note": "Backend persistence is not verified in the test design." }
-    ]
+    "covered": [],
+    "missing": []
   },
-  "coverageAreaGaps": [
-    { "area": "api", "note": "API verification coverage appears limited." }
-  ],
+  "coverageAreaGaps": [],
   "accuracyIssues": ["unsupported or invented claims only"],
   "qualityIssues": ["usefulness problems in the existing output only"],
   "strengths": ["what the output did well"],

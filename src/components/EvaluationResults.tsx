@@ -3,7 +3,6 @@
 import { useState } from "react";
 import type { EvaluationResult } from "@/lib/evaluation/types";
 import { buildCoverageBreakdown } from "@/lib/evaluation/coverage-breakdown";
-import { COVERAGE_AREA_LABELS } from "@/lib/evaluation/coverage-areas";
 import { buildEvaluationMarkdown, downloadTextFile } from "@/lib/export-reports";
 
 interface EvaluationResultsProps {
@@ -35,37 +34,6 @@ function IssueList({ title, items }: { title: string; items: string[] }) {
               className="rounded-md border border-red-200 bg-white px-3 py-2 font-medium text-red-800"
             >
               {item}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="mt-2 text-sm text-emerald-700">None identified.</p>
-      )}
-    </div>
-  );
-}
-
-function CoverageAreaGapList({
-  gaps,
-}: {
-  gaps: EvaluationResult["coverageAreaGaps"];
-}) {
-  return (
-    <div>
-      <h3 className="text-sm font-semibold text-slate-900">
-        Coverage area gaps ({gaps.length})
-      </h3>
-      {gaps.length > 0 ? (
-        <ul className="mt-2 space-y-2 text-sm text-slate-700">
-          {gaps.map((gap) => (
-            <li
-              key={`${gap.area}-${gap.note}`}
-              className="rounded-md border border-amber-200 bg-white px-3 py-2"
-            >
-              <span className="font-medium text-slate-900">
-                {COVERAGE_AREA_LABELS[gap.area]}
-              </span>
-              <span className="text-slate-600"> — {gap.note}</span>
             </li>
           ))}
         </ul>
@@ -233,13 +201,7 @@ export default function EvaluationResults({
 
       <CoverageBreakdownPanel evaluation={evaluation} />
 
-      <p className="mt-4 text-xs text-slate-500">
-        Coverage area gaps name weak testing categories — not replacement test
-        cases. The Analyzer creates tests; this panel judges them.
-      </p>
-
-      <div className="mt-3 grid gap-4 lg:grid-cols-2">
-        <CoverageAreaGapList gaps={evaluation.coverageAreaGaps} />
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <IssueList title="Accuracy issues" items={evaluation.accuracyIssues} />
         <IssueList title="Quality issues" items={evaluation.qualityIssues} />
       </div>

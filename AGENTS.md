@@ -126,10 +126,10 @@ Coverage score + feedback
 - **Input contract** — evaluator receives `originalWorkItem` (user ticket only) + serialized analyzer output; prompts never appear in the report
 - **Rubric** — accuracy/coverage/quality derived from issue counts in `evaluator-prompt.ts` (not free-form guessing)  
 - **Coverage area gaps** — category-based (`validation`, `api`, `edge`, `persistence`, etc.) via `coverage-areas.ts`  
-- **Coverage breakdown** — evaluator returns `coverageTheme` + `coverageBreakdown` (workflow-specific covered/missing labels); hard checks adjust score only  
+- **Coverage breakdown** — evaluator returns `coverageTheme` + `coverageBreakdown` with labels derived from the work item workflow (same dynamic approach as the theme); hard checks adjust score only  
 - **Theme checks** — `hard-checks.ts`; −5 **coverage** per missing theme (not quality)  
 - **After analyze** — **Analyze & evaluate** runs `POST /api/evaluate` (3 LLM calls: 1 generate + 2 evaluate). **Analyze** is report-only (1 call).  
-- **Panel** — median + average + range, coverage breakdown, coverage area gap notes, accuracy/quality issues  
+- **Panel** — median + average + range, coverage breakdown (includes scoring gaps), accuracy/quality issues  
 - **Export** — `evaluation-report.md`
 
 ### Intentional MVP boundaries (today)
@@ -522,5 +522,5 @@ Use this section for future work; remove items when done and note in Changelog.
 | 2026-06-16 | **Analyzer/evaluator split:** coverage-driven generator; evaluator reports coverage areas + accuracy/quality issues. |
 | 2026-06-16 | **Evaluation:** split accuracy vs coverage in AI quality evaluation output. |
 | 2026-06-16 | **Generator prompt:** require more edge-case coverage for async/event-driven inputs in Analyze output. |
-| 2026-06-16 | **Coverage breakdown:** evaluator LLM returns dynamic `coverageTheme` and workflow-specific covered/missing labels (replaces regex heuristics). |
+| 2026-06-16 | **Coverage breakdown:** merge coverage area gaps into missing list; hide duplicate gaps section; dedupe improvement suggestions. |
 | 2026-06-16 | **Evaluator:** flag duplication/over-automation as quality issues; do not flag correct reproduction expected results as vague. |

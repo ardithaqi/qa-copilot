@@ -53,6 +53,65 @@ function unionUniqueStrings(arrays: string[][]): string[] {
   return result;
 }
 
+function tokenSet(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      .replace(/[^\w\s]/g, " ")
+      .split(/\s+/)
+      .filter((word) => word.length > 3)
+  );
+}
+
+function areSimilarSuggestions(a: string, b: string): boolean {
+  const na = a.toLowerCase().trim();
+  const nb = b.toLowerCase().trim();
+  if (!na || !nb) {
+    return false;
+  }
+  if (na === nb) {
+    return true;
+  }
+  if (na.includes(nb) || nb.includes(na)) {
+    return true;
+  }
+
+  const wordsA = tokenSet(na);
+  const wordsB = tokenSet(nb);
+  if (wordsA.size === 0 || wordsB.size === 0) {
+    return false;
+  }
+
+  let intersection = 0;
+  for (const word of wordsA) {
+    if (wordsB.has(word)) {
+      intersection += 1;
+    }
+  }
+
+  const union = new Set([...wordsA, ...wordsB]).size;
+  return intersection / union >= 0.55;
+}
+
+function unionUniqueSimilarStrings(arrays: string[][]): string[] {
+  const result: string[] = [];
+
+  for (const array of arrays) {
+    for (const item of array) {
+      const trimmed = item.trim();
+      if (!trimmed) {
+        continue;
+      }
+      if (result.some((existing) => areSimilarSuggestions(existing, trimmed))) {
+        continue;
+      }
+      result.push(trimmed);
+    }
+  }
+
+  return result;
+}
+
 function itemsInMultipleRuns(arrays: string[][], minRuns = 2): string[] {
   const counts = new Map<string, { count: number; label: string }>();
 
@@ -291,7 +350,7 @@ export function aggregateEvaluationRuns(
     accuracyIssues: mergeGapLists(runs, (run) => run.accuracyIssues),
     qualityIssues: mergeGapLists(runs, (run) => run.qualityIssues),
     strengths: unionUniqueStrings(runs.map((run) => run.strengths)),
-    improvementSuggestions: unionUniqueStrings(
+    improvementSuggestions: unionUniqueSimilarStrings(
       runs.map((run) => run.improvementSuggestions)
     ),
     scores: {
