@@ -53,9 +53,10 @@ The current system focuses mainly on **generation**.
 
 After generation, a **second LLM pass** evaluates output quality:
 
-- Coverage % and overall quality score  
-- Missing scenarios, edge cases, API validations, risks  
-- Strengths and improvement suggestions  
+- Coverage %, accuracy %, and quality score  
+- **Coverage area gaps** (validation, API, edge, persistence, etc.) — not replacement test cases  
+- Accuracy issues (hallucinations only) and quality issues (vagueness/usefulness in existing output)  
+- Strengths and improvement suggestions (reviewer feedback, not a replacement test suite)  
 - `POST /api/evaluate` — `{ analysis, requirement, provider }` → `evaluateWithLlm()`  
 - UI: **AI quality evaluation** panel after every successful analyze (two LLM calls total)  
 - Export: `evaluation-report.md`  
@@ -82,7 +83,7 @@ Coverage score + feedback
 | - | - |
 | **Input** | “User can reset password via email.” |
 | **Generated** | Valid email · Invalid email · Empty email · Expired link |
-| **Evaluator** | Coverage: 80% · **Missing:** Reused link scenario · Suggestions: add rate-limit test |
+| **Evaluator** | Coverage: 80% · **Gap:** edge coverage appears limited · **Accuracy:** no invented details |
 
 ### Evaluation approach
 
@@ -93,16 +94,16 @@ Coverage score + feedback
 ### Constraints for evaluation work
 
 - Keep explanations simple; focus on practical QA automation use cases.  
-- Realistic for a QA Automation Engineer (coverage gaps you would actually care about in review).  
-- Evaluation is additive — runs after generation; uses one extra LLM call per analyze.  
-- Evaluator must not invent product details beyond the requirement + generated output.
+- Evaluator behaves as a **Senior QA Lead reviewer** — coverage area gaps, not replacement test cases  
+- Evaluator must not invent product details beyond the requirement + generated output  
+- Evaluator must not penalize missing exact messages, routes, or API fields unless stated in the ticket  
 
 ### Key concepts (interview / design language)
 
 | Term | Meaning |
 | ---- | ------- |
 | **LLM-as-judge** | Second model pass that scores generated QA output on coverage, completeness, and gaps |
-| **Evaluation framework** | Scores outputs on coverage, completeness, relevance, consistency, missing scenarios |
+| **Evaluation framework** | Scores outputs on accuracy, coverage areas, and usefulness (clarity, actionability) |
 | **AI regression** | Output quality drops after prompt, model, or logic changes |
 
 ---
@@ -113,7 +114,7 @@ Coverage score + feedback
 
 - **10 report sections** in JSON; **6 shown in UI** (risks, grouped test cases, automation, Playwright, API when relevant, final notes). Work item type, summary, business rules, and missing-info are internal only.
 - **Test Cases** — scenarios with plain metadata line: `#01 · Type · Priority` (no colored badges).
-- **Automation Recommendations** — priority `High|Medium|Low` (P0/P1/P2 normalized in parser); layer UI|API|E2E; why automate / keep manual.
+- **Automation Recommendations** — selective subset of manual cases; priority `High|Medium|Low`; layer `UI|API|Integration|Unit|E2E`; `manualOnly` for stay-manual scenarios.
 - **Playwright** — prompt + `resolvePlaywrightSkeleton()` in `src/lib/playwright-skeleton.ts`: aligns tests to automation candidates; replaces generic `TODO: feature name` placeholders; every **High** priority automatable candidate gets a test.
 - **Exports** — `test-cases.md`, `{scenario}.spec.ts` filename from primary automation scenario.
 - **Secrets** — `.env.local` gitignored; BYOK per provider; see README **API keys (required)**.
@@ -122,10 +123,12 @@ Coverage score + feedback
 ### Evaluation (LLM judge + hardened scoring)
 
 - **`src/lib/evaluation/`** — evaluator prompts, 2 parallel LLM passes (temp 0.1), median/average aggregation, hard checks
-- **Rubric** — scores derived from gap counts in `evaluator-prompt.ts` (not free-form guessing)
-- **Hard checks** — `hard-checks.ts` keyword rules for password-reset and image-upload patterns; −7 quality per failed criterion
-- **After analyze** — **Analyze & evaluate** runs `POST /api/evaluate` (3 LLM calls: 1 generate + 2 evaluate). **Analyze** is report-only (1 call).
-- **Panel** — median + average + range, hard-check breakdown, gap lists (prefer gaps seen in 2+ runs)
+- **Input contract** — evaluator receives `originalWorkItem` (user ticket only) + serialized analyzer output; prompts never appear in the report
+- **Rubric** — accuracy/coverage/quality derived from issue counts in `evaluator-prompt.ts` (not free-form guessing)  
+- **Coverage area gaps** — category-based (`validation`, `api`, `edge`, `persistence`, etc.) via `coverage-areas.ts`  
+- **Hard checks** — `hard-checks.ts` thematic keyword rules (context-aware); −5 **coverage** per failed theme (not quality)  
+- **After analyze** — **Analyze & evaluate** runs `POST /api/evaluate` (3 LLM calls: 1 generate + 2 evaluate). **Analyze** is report-only (1 call).  
+- **Panel** — median + average + range, hard-check breakdown, coverage area gaps (prefer gaps seen in 2+ runs), accuracy/quality issues  
 - **Export** — `evaluation-report.md`
 
 ### Intentional MVP boundaries (today)
@@ -203,7 +206,7 @@ Only the key for the **selected provider** must be set for that run. For product
 ### Evaluation flow (Analyze & evaluate button)
 
 1. User clicks **Analyze** → `POST /api/analyze` (generator LLM).  
-2. Client calls `POST /api/evaluate` with `{ analysis, requirement, provider, attachments? }`.  
+2. Client calls `POST /api/evaluate` with `{ analysis, originalWorkItem, provider, attachments? }`.  
 3. `evaluateWithLlm()` serializes the report, sends evaluator prompt, parses JSON scores.  
 4. UI shows **AI quality evaluation** panel above report sections; user can download `evaluation-report.md`.
 
@@ -325,7 +328,7 @@ Request body:
 ```json
 {
   "analysis": { /* QAAnalysis */ },
-  "requirement": "original requirement text (required)",
+  "originalWorkItem": "original ticket text (required)",
   "provider": "groq | openai | gemini",
   "attachments": [ /* same shape as analyze; optional */ ]
 }
@@ -337,23 +340,25 @@ Success:
 {
   "evaluation": {
     "coveragePercent": 80,
+    "accuracyScore": 95,
     "qualityScore": 75,
     "summary": "Overall assessment…",
-    "missingScenarios": ["Reused reset link"],
-    "missingEdgeCases": [],
-    "missingApiValidations": [],
-    "missingRisks": [],
-    "strengths": ["Clear negative email tests"],
-    "improvementSuggestions": ["Add rate-limit scenario"],
-    "method": "llm"
+    "coverageAreaGaps": [
+      { "area": "persistence", "note": "State persistence coverage appears limited." }
+    ],
+    "accuracyIssues": [],
+    "qualityIssues": [],
+    "strengths": ["Clear negative validation cases"],
+    "improvementSuggestions": ["Expand duplicate-submit coverage areas"],
+    "method": "llm+hardened"
   },
-  "requirement": "User can reset password via email",
+  "originalWorkItem": "User can reset password via email",
   "provider": "groq"
 }
 ```
 
 **Route:** `src/app/api/evaluate/route.ts`  
-**Flow:** validate `analysis` + `requirement` → `evaluateWithLlm()` → `parseEvaluationResponse()` → JSON
+**Flow:** validate `analysis` + `originalWorkItem` → `evaluateWithLlm()` → `parseEvaluationResponse()` → JSON
 
 ---
 
@@ -387,13 +392,17 @@ QA Copilot/
     └── lib/
         ├── evaluation/
         │   ├── types.ts
+        │   ├── coverage-areas.ts     # coverage category ids + labels
         │   ├── evaluator-prompt.ts
+        │   ├── aggregate-evaluation.ts
+        │   ├── hard-checks.ts
         │   ├── serialize-analysis.ts
         │   ├── llm-evaluator.ts
         │   ├── parse-evaluation.ts
         │   └── index.ts
         ├── prompt/
         │   ├── agent-prompt.ts         # buildSystemPrompt, buildUserPrompt
+        │   ├── senior-qa-coverage.ts   # generic senior QA coverage rules
         │   ├── strategies.ts           # per-type strategy text
         │   └── index.ts
         ├── llm/
@@ -410,6 +419,7 @@ QA Copilot/
         │   ├── client.ts               # browser File → base64
         │   └── index.ts
         ├── generate-analysis.ts        # wires prompt + llm
+        ├── work-item-text.ts           # extractOriginalWorkItem from user paste
         ├── parse-analysis.ts           # JSON → QAAnalysis (+ legacy fields)
         ├── analysis-errors.ts          # friendly error messages
         ├── playwright-skeleton.ts      # resolvePlaywrightSkeleton, generatePlaywrightFromCandidates
@@ -507,6 +517,9 @@ Use this section for future work; remove items when done and note in Changelog.
 | 2026-06-02 | Renamed project from QA Copilot to **QA Architect** (UI, docs, `package.json` name). |
 | 2026-06-01 | Created AGENTS.md. Documented Test Design Agent, multi-provider, work item types, 11 output sections, exports, architecture. |
 | 2026-06-01 | Prior session: MVP from oleaburger → standalone; Groq/Gemini/OpenAI providers; improved prompts; agent workflow. |
+| 2026-06-16 | **Evaluator:** coverage area gaps (category-based reviewer); no TC-type gaps; quality rules forbid penalizing unspecified ticket details. |
+| 2026-06-16 | **Analyzer/evaluator split:** coverage-driven generator; evaluator reports coverage areas + accuracy/quality issues. |
 | 2026-06-16 | **Evaluation:** split accuracy vs coverage in AI quality evaluation output. |
 | 2026-06-16 | **Generator prompt:** require more edge-case coverage for async/event-driven inputs in Analyze output. |
-| 2026-06-16 | **Generator prompt:** strengthen async/event-driven checklist items so Analyze includes DB side effects, consumer vs broker outage, and explicit retry/schema edge cases. |
+| 2026-06-16 | **Save/persist bug floor:** 6–8 manual + 4 automation minimum; evaluator forbids false reproduction quality flags; hard checks = 3 themes only. |
+| 2026-06-16 | **Evaluator:** flag duplication/over-automation as quality issues; do not flag correct reproduction expected results as vague. |

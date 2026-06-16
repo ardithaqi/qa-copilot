@@ -86,7 +86,10 @@ export interface QAAnalysis {
 }
 
 export interface AnalyzeRequest {
-  input: string;
+  /** User's raw ticket/requirement only. */
+  originalWorkItem?: string;
+  /** @deprecated Use originalWorkItem */
+  input?: string;
   provider: UiLlmProviderId;
   workItemType: WorkItemTypeSelection;
   attachments?: MediaAttachment[];
@@ -96,6 +99,7 @@ export interface AnalyzeSuccessResponse {
   analysis: QAAnalysis;
   provider: UiLlmProviderId;
   usage: LlmUsageSummary;
+  originalWorkItem: string;
 }
 
 export interface AnalyzeErrorResponse {

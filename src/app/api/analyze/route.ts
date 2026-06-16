@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { parseAttachmentsFromBody, validateAttachments } from "@/lib/attachments";
 import { toUserFacingAnalysisError } from "@/lib/analysis-errors";
 import { generateAnalysis } from "@/lib/generate-analysis";
+import { resolveOriginalWorkItem } from "@/lib/work-item-text";
 import { assertUiProviderSupported, logUsageSummary, summarizeLlmUsage } from "@/lib/llm";
 import { parseAnalysisResponse } from "@/lib/parse-analysis";
 import type { AnalyzeRequest, UiLlmProviderId } from "@/types/qa-analysis";
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const input = body.input?.trim();
+    const originalWorkItem = resolveOriginalWorkItem(body.originalWorkItem, body.input);
     const providerRaw = (body.provider ?? "groq").toLowerCase();
     const workItemTypeRaw = (body.workItemType ?? "auto").toLowerCase();
 
@@ -53,9 +54,9 @@ export async function POST(request: Request) {
 
     const workItemType: WorkItemTypeSelection = workItemTypeRaw;
 
-    if (!input) {
+    if (!originalWorkItem) {
       return NextResponse.json(
-        { error: "Please enter feature requirements before analyzing." },
+        { error: "Please enter a work item before analyzing." },
         { status: 400 }
       );
     }
@@ -72,7 +73,7 @@ export async function POST(request: Request) {
     }
 
     const llmResult = await generateAnalysis(
-      input,
+      originalWorkItem,
       provider,
       workItemType,
       attachments
@@ -81,7 +82,7 @@ export async function POST(request: Request) {
     const usage = summarizeLlmUsage([llmResult], provider);
     logUsageSummary("analyze", usage);
 
-    return NextResponse.json({ analysis, provider, usage });
+    return NextResponse.json({ analysis, provider, usage, originalWorkItem });
   } catch (error) {
     console.error("Analyze API error:", error);
     const message = toUserFacingAnalysisError(error, provider);

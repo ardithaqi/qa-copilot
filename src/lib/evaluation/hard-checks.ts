@@ -63,6 +63,75 @@ const HARD_CHECK_RULES: HardCheckRule[] = [
     ],
   },
   {
+    id: "persist-save-update-flow",
+    label: "Save / update / persist flow",
+    appliesTo: (requirement) => {
+      const norm = normalizeRequirement(requirement);
+      const hasSaveFlow = includesAny(norm, [
+        /\bsave\b/,
+        /\bupdate\b/,
+        /\bsubmit\b/,
+        /\bpersist/,
+        /\bprofile\b/,
+      ]);
+      const hasPersistConcern = includesAny(norm, [
+        /\bunchanged\b/,
+        /\bnot saved\b/,
+        /\bnot persist/,
+        /\bunable to save\b/,
+        /\bstill (display|show)/,
+        /\brefresh/,
+        /\bconfirm/,
+        /\bno (error|message|feedback)/,
+        /\bsilent/,
+      ]);
+      return hasSaveFlow && (hasPersistConcern || norm.includes("persist"));
+    },
+    criteria: [
+      {
+        label: "Core success and persistence coverage",
+        matches: (h) =>
+          includesAny(h, [
+            /(?:save|update|submit).{0,80}(?:persist|refresh|reload|display|shown|visible|correct|remain)/,
+            /persist.{0,60}(?:refresh|save|update|session|navigation|after)/,
+            /refresh.{0,60}(?:persist|remain|correct|display|shown)/,
+            /reproduc/,
+            /happy path/,
+            /successful save/,
+          ]),
+      },
+      {
+        label: "Validation coverage",
+        matches: (h) =>
+          includesAny(h, [
+            /invalid/,
+            /validation/,
+            /negative/,
+            /reject/,
+            /empty/,
+            /required/,
+            /missing.{0,30}(input|field|value)/,
+          ]),
+      },
+      {
+        label: "Failure handling coverage",
+        matches: (h) =>
+          includesAny(h, [
+            /network/,
+            /timeout/,
+            /offline/,
+            /connectivity/,
+            /\bserver\b/,
+            /\bapi\b/,
+            /fail/,
+            /error.{0,30}handl/,
+            /unavailable/,
+            /5\d\d/,
+          ]),
+      },
+    ],
+  },
+  {
     id: "image-upload-limit",
     label: "Image upload limit",
     appliesTo: (requirement) => {
@@ -93,10 +162,7 @@ const HARD_CHECK_RULES: HardCheckRule[] = [
   },
 ];
 
-function evaluateRule(
-  rule: HardCheckRule,
-  haystack: string
-): HardCheckResult {
+function evaluateRule(rule: HardCheckRule, haystack: string): HardCheckResult {
   const criteria: HardCheckCriterionResult[] = rule.criteria.map((criterion) => ({
     label: criterion.label,
     passed: criterion.matches(haystack),
@@ -105,7 +171,7 @@ function evaluateRule(
   return {
     ruleId: rule.id,
     ruleLabel: rule.label,
-    passed: criteria.every((criterion) => criterion.passed),
+    passed: criteria.length === 0 || criteria.every((criterion) => criterion.passed),
     criteria,
   };
 }

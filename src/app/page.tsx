@@ -42,9 +42,9 @@ export default function Home() {
     null
   );
   const [evaluation, setEvaluation] = useState<EvaluationResult | null>(null);
-  const [evaluationRequirement, setEvaluationRequirement] = useState<string | null>(
-    null
-  );
+  const [evaluationOriginalWorkItem, setEvaluationOriginalWorkItem] = useState<
+    string | null
+  >(null);
   const [runUsage, setRunUsage] = useState<LlmUsageSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingMode, setLoadingMode] = useState<"generate" | "evaluate" | null>(
@@ -97,7 +97,7 @@ export default function Home() {
     setAnalysis(null);
     setResultProvider(null);
     setEvaluation(null);
-    setEvaluationRequirement(null);
+    setEvaluationOriginalWorkItem(null);
     setRunUsage(null);
 
     try {
@@ -107,7 +107,7 @@ export default function Home() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            input: trimmed,
+            originalWorkItem: trimmed,
             provider,
             workItemType,
             attachments,
@@ -138,9 +138,13 @@ export default function Home() {
         throw new Error("No analysis data returned. Please try again.");
       }
 
+      const analyzedWorkItem =
+        successData.originalWorkItem?.trim() || trimmed;
+
       setAnalysis(successData.analysis);
       setResultProvider(successData.provider ?? provider);
       setRunUsage(successData.usage);
+      setEvaluationOriginalWorkItem(analyzedWorkItem);
 
       if (!withEvaluation) {
         return;
@@ -152,7 +156,7 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           analysis: successData.analysis,
-          requirement: trimmed,
+          originalWorkItem: analyzedWorkItem,
           provider,
           attachments,
         }),
@@ -174,7 +178,7 @@ export default function Home() {
 
       const evalSuccess = evalData as EvaluateSuccessResponse;
       setEvaluation(evalSuccess.evaluation);
-      setEvaluationRequirement(evalSuccess.requirement);
+      setEvaluationOriginalWorkItem(evalSuccess.originalWorkItem);
       setRunUsage(mergeUsageSummaries(successData.usage, evalSuccess.usage));
     } catch (err) {
       setError(
@@ -339,7 +343,7 @@ export default function Home() {
           <AnalysisResults
             analysis={analysis}
             evaluation={evaluation}
-            evaluationRequirement={evaluationRequirement}
+            evaluationOriginalWorkItem={evaluationOriginalWorkItem}
           />
         </div>
       )}

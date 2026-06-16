@@ -13,7 +13,7 @@ import {
 interface AnalysisResultsProps {
   analysis: QAAnalysis;
   evaluation?: EvaluationResult | null;
-  evaluationRequirement?: string | null;
+  evaluationOriginalWorkItem?: string | null;
 }
 
 function Section({
@@ -180,7 +180,7 @@ function AutomationCard({ candidate }: { candidate: AutomationCandidate }) {
 export default function AnalysisResults({
   analysis,
   evaluation,
-  evaluationRequirement,
+  evaluationOriginalWorkItem,
 }: AnalysisResultsProps) {
   const hasRisks =
     analysis.risks.product.length > 0 ||
@@ -197,10 +197,10 @@ export default function AnalysisResults({
     <div className="space-y-5">
       <ExportDownloads analysis={analysis} />
 
-      {evaluation && evaluationRequirement ? (
+      {evaluation && evaluationOriginalWorkItem ? (
         <EvaluationResults
           evaluation={evaluation}
-          requirement={evaluationRequirement}
+          originalWorkItem={evaluationOriginalWorkItem}
         />
       ) : null}
 

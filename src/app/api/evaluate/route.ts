@@ -10,6 +10,7 @@ import type {
 import { assertUiProviderSupported, logUsageSummary } from "@/lib/llm";
 import type { UiLlmProviderId } from "@/lib/llm/types";
 import type { QAAnalysis } from "@/types/qa-analysis";
+import { resolveOriginalWorkItem } from "@/lib/work-item-text";
 
 function isValidAnalysis(analysis: unknown): analysis is QAAnalysis {
   if (!analysis || typeof analysis !== "object") {
@@ -37,7 +38,7 @@ export async function POST(request: Request) {
       return NextResponse.json<EvaluateErrorResponse>(
         {
           error:
-            "Invalid request body. Send JSON with analysis, requirement, and provider.",
+            "Invalid request body. Send JSON with analysis, originalWorkItem, and provider.",
         },
         { status: 400 }
       );
@@ -50,10 +51,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const requirement = body.requirement?.trim();
-    if (!requirement) {
+    const originalWorkItem = resolveOriginalWorkItem(
+      body.originalWorkItem,
+      body.requirement
+    );
+    if (!originalWorkItem) {
       return NextResponse.json<EvaluateErrorResponse>(
-        { error: "Please provide the original requirement text for evaluation." },
+        { error: "Please provide the original work item text for evaluation." },
         { status: 400 }
       );
     }
@@ -81,7 +85,7 @@ export async function POST(request: Request) {
     }
 
     const { evaluation, usage } = await evaluateWithLlm(
-      requirement,
+      originalWorkItem,
       body.analysis,
       provider,
       attachments
@@ -90,7 +94,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json<EvaluateSuccessResponse>({
       evaluation,
-      requirement,
+      originalWorkItem,
       provider,
       usage,
     });

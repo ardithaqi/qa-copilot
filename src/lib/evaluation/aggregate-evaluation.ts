@@ -1,6 +1,8 @@
 import {
   HARD_CHECK_PENALTY_PER_FAILURE,
 } from "@/lib/evaluation/constants";
+import type { CoverageAreaGap } from "@/lib/evaluation/coverage-areas";
+import { COVERAGE_AREA_IDS } from "@/lib/evaluation/coverage-areas";
 import {
   countFailedHardCheckCriteria,
   runHardChecks,
@@ -74,6 +76,59 @@ function itemsInMultipleRuns(arrays: string[][], minRuns = 2): string[] {
     .map((entry) => entry.label);
 }
 
+function gapKey(gap: CoverageAreaGap): string {
+  return `${gap.area}::${gap.note.toLowerCase().trim()}`;
+}
+
+function mergeCoverageAreaGaps(runs: LlmEvaluationRun[]): CoverageAreaGap[] {
+  const areaCounts = new Map<
+    string,
+    { count: number; gap: CoverageAreaGap }
+  >();
+
+  for (const run of runs) {
+    const seenInRun = new Set<string>();
+    for (const gap of run.coverageAreaGaps) {
+      const key = gapKey(gap);
+      if (seenInRun.has(key)) {
+        continue;
+      }
+      seenInRun.add(key);
+      const existing = areaCounts.get(key);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        areaCounts.set(key, { count: 1, gap });
+      }
+    }
+  }
+
+  const minRuns = runs.length > 1 ? 2 : 1;
+  const merged = [...areaCounts.values()]
+    .filter((entry) => entry.count >= minRuns)
+    .map((entry) => entry.gap);
+
+  if (merged.length > 0) {
+    return merged.sort(
+      (a, b) =>
+        COVERAGE_AREA_IDS.indexOf(a.area) - COVERAGE_AREA_IDS.indexOf(b.area)
+    );
+  }
+
+  const fallbackByArea = new Map<string, CoverageAreaGap>();
+  for (const run of runs) {
+    for (const gap of run.coverageAreaGaps) {
+      if (!fallbackByArea.has(gap.area)) {
+        fallbackByArea.set(gap.area, gap);
+      }
+    }
+  }
+
+  return COVERAGE_AREA_IDS.filter((id) => fallbackByArea.has(id)).map(
+    (id) => fallbackByArea.get(id)!
+  );
+}
+
 function pickRepresentativeSummary(
   runs: LlmEvaluationRun[],
   targetQuality: number
@@ -92,80 +147,58 @@ function pickRepresentativeSummary(
   return best.summary;
 }
 
-function applyHardCheckPenalty(
-  llmQualityMedian: number,
+function applyHardCheckPenaltyToCoverage(
+  llmCoverageMedian: number,
   hardChecks: HardCheckResult[]
-): { qualityScore: number; hardCheckPenalty: number } {
+): { coveragePercent: number; hardCheckPenalty: number } {
   const failedCriteria = countFailedHardCheckCriteria(hardChecks);
   const hardCheckPenalty = failedCriteria * HARD_CHECK_PENALTY_PER_FAILURE;
-  const qualityScore = Math.max(0, llmQualityMedian - hardCheckPenalty);
-  return { qualityScore, hardCheckPenalty };
+  const coveragePercent = Math.max(0, llmCoverageMedian - hardCheckPenalty);
+  return { coveragePercent, hardCheckPenalty };
+}
+
+function mergeGapLists(
+  runs: LlmEvaluationRun[],
+  picker: (run: LlmEvaluationRun) => string[]
+): string[] {
+  const consistent = itemsInMultipleRuns(runs.map(picker));
+  return consistent.length > 0 ? consistent : unionUniqueStrings(runs.map(picker));
 }
 
 export function aggregateEvaluationRuns(
   runs: LlmEvaluationRun[],
-  requirement: string,
+  originalWorkItem: string,
   analysis: QAAnalysis
 ): EvaluationResult {
   const coverages = runs.map((run) => run.coveragePercent);
   const accuracies = runs.map((run) => run.accuracyScore);
   const qualities = runs.map((run) => run.qualityScore);
-  const coverageMedian = median(coverages);
+  const llmCoverageMedian = median(coverages);
   const qualityMedian = median(qualities);
   const accuracyMedian = median(accuracies);
-  const hardChecks = runHardChecks(requirement, analysis);
-  const { qualityScore, hardCheckPenalty } = applyHardCheckPenalty(
-    qualityMedian,
+  const hardChecks = runHardChecks(originalWorkItem, analysis);
+  const { coveragePercent, hardCheckPenalty } = applyHardCheckPenaltyToCoverage(
+    llmCoverageMedian,
     hardChecks
   );
 
-  const consistentMissingScenarios = itemsInMultipleRuns(
-    runs.map((run) => run.missingScenarios)
-  );
-  const consistentMissingEdgeCases = itemsInMultipleRuns(
-    runs.map((run) => run.missingEdgeCases)
-  );
-  const consistentMissingApiValidations = itemsInMultipleRuns(
-    runs.map((run) => run.missingApiValidations)
-  );
-  const consistentMissingRisks = itemsInMultipleRuns(runs.map((run) => run.missingRisks));
-  const consistentAccuracyIssues = itemsInMultipleRuns(
-    runs.map((run) => run.accuracyIssues)
-  );
-
   return {
-    coveragePercent: coverageMedian,
+    coveragePercent,
+    llmCoverageMedian,
     accuracyScore: accuracyMedian,
-    qualityScore,
+    qualityScore: qualityMedian,
     llmQualityMedian: qualityMedian,
     summary: pickRepresentativeSummary(runs, qualityMedian),
-    missingScenarios:
-      consistentMissingScenarios.length > 0
-        ? consistentMissingScenarios
-        : unionUniqueStrings(runs.map((run) => run.missingScenarios)),
-    missingEdgeCases:
-      consistentMissingEdgeCases.length > 0
-        ? consistentMissingEdgeCases
-        : unionUniqueStrings(runs.map((run) => run.missingEdgeCases)),
-    missingApiValidations:
-      consistentMissingApiValidations.length > 0
-        ? consistentMissingApiValidations
-        : unionUniqueStrings(runs.map((run) => run.missingApiValidations)),
-    missingRisks:
-      consistentMissingRisks.length > 0
-        ? consistentMissingRisks
-        : unionUniqueStrings(runs.map((run) => run.missingRisks)),
-    accuracyIssues:
-      consistentAccuracyIssues.length > 0
-        ? consistentAccuracyIssues
-        : unionUniqueStrings(runs.map((run) => run.accuracyIssues)),
+    coverageAreaGaps: mergeCoverageAreaGaps(runs),
+    accuracyIssues: mergeGapLists(runs, (run) => run.accuracyIssues),
+    qualityIssues: mergeGapLists(runs, (run) => run.qualityIssues),
     strengths: unionUniqueStrings(runs.map((run) => run.strengths)),
     improvementSuggestions: unionUniqueStrings(
       runs.map((run) => run.improvementSuggestions)
     ),
     scores: {
       evaluationRuns: runs.length,
-      coverageMedian,
+      coverageMedian: llmCoverageMedian,
       coverageAverage: average(coverages),
       coverageMin: Math.min(...coverages),
       coverageMax: Math.max(...coverages),

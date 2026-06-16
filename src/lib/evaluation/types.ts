@@ -1,20 +1,20 @@
+import type { CoverageAreaGap } from "@/lib/evaluation/coverage-areas";
 import type { UiLlmProviderId } from "@/lib/llm/types";
 import type { LlmUsageSummary } from "@/lib/llm/usage-types";
 import type { MediaAttachment } from "@/types/attachments";
 import type { QAAnalysis } from "@/types/qa-analysis";
 
+export type { CoverageAreaGap };
+export type { CoverageAreaId } from "@/lib/evaluation/coverage-areas";
+
 export interface LlmEvaluationRun {
   coveragePercent: number;
-  /** Accuracy of claims vs the requirement (hallucinations / wrong claims). */
   accuracyScore: number;
   qualityScore: number;
   summary: string;
-  missingScenarios: string[];
-  missingEdgeCases: string[];
-  missingApiValidations: string[];
-  missingRisks: string[];
-  /** Output assertions that are not supported by the requirement/media (hallucinations / wrong claims). */
+  coverageAreaGaps: CoverageAreaGap[];
   accuracyIssues: string[];
+  qualityIssues: string[];
   strengths: string[];
   improvementSuggestions: string[];
 }
@@ -48,14 +48,11 @@ export interface HardCheckResult {
 }
 
 export interface EvaluationResult extends LlmEvaluationRun {
-  /** Primary display score — median coverage across runs. */
   coveragePercent: number;
-  /** Accuracy of claims vs requirement (median across runs). */
   accuracyScore: number;
-  /** Final quality — median LLM quality minus hard-check penalties. */
   qualityScore: number;
-  /** Median LLM quality before hard-check adjustment. */
   llmQualityMedian: number;
+  llmCoverageMedian: number;
   scores: EvaluationScoreStats;
   hardChecks: HardCheckResult[];
   hardCheckPenalty: number;
@@ -64,14 +61,17 @@ export interface EvaluationResult extends LlmEvaluationRun {
 
 export interface EvaluateRequest {
   analysis: QAAnalysis;
-  requirement: string;
+  /** User's raw ticket/requirement only — not analyzer or evaluator prompts. */
+  originalWorkItem: string;
+  /** @deprecated Use originalWorkItem */
+  requirement?: string;
   provider: UiLlmProviderId;
   attachments?: MediaAttachment[];
 }
 
 export interface EvaluateSuccessResponse {
   evaluation: EvaluationResult;
-  requirement: string;
+  originalWorkItem: string;
   provider: UiLlmProviderId;
   usage: LlmUsageSummary;
 }

@@ -99,6 +99,22 @@ function buildTestBody(candidate: AutomationCandidate): string[] {
   return lines;
 }
 
+const PLAYWRIGHT_LAYERS = new Set(["ui", "e2e", "integration"]);
+
+export function isPlaywrightEligibleCandidate(
+  candidate: AutomationCandidate
+): boolean {
+  if (candidate.manualOnly) return false;
+  const layer = candidate.layer.trim().toLowerCase();
+  return PLAYWRIGHT_LAYERS.has(layer);
+}
+
+function playwrightEligibleCandidates(
+  candidates: AutomationCandidate[]
+): AutomationCandidate[] {
+  return candidates.filter(isPlaywrightEligibleCandidate);
+}
+
 function sortCandidatesForSkeleton(
   candidates: AutomationCandidate[]
 ): AutomationCandidate[] {
@@ -119,7 +135,7 @@ export function generatePlaywrightFromCandidates(
   analysis: QAAnalysis
 ): string {
   const candidates = sortCandidatesForSkeleton(
-    analysis.automationCandidates.filter((c) => !c.manualOnly)
+    playwrightEligibleCandidates(analysis.automationCandidates)
   );
 
   if (candidates.length === 0) {
@@ -203,12 +219,12 @@ function ensurePlaywrightImport(code: string): string {
 }
 
 /**
- * Prefer LLM skeleton when meaningful; otherwise build from automation candidates.
- * Ensures every High-priority automatable candidate has at least one test.
+ * Prefer LLM skeleton when meaningful; otherwise build from eligible automation candidates.
+ * Ensures every High-priority UI/E2E/Integration candidate has at least one test.
  */
 export function resolvePlaywrightSkeleton(analysis: QAAnalysis): string {
   const raw = (analysis.playwrightTestSkeletons ?? "").trim();
-  const automatable = analysis.automationCandidates.filter((c) => !c.manualOnly);
+  const automatable = playwrightEligibleCandidates(analysis.automationCandidates);
 
   if (automatable.length === 0) {
     if (raw && !isGenericPlaywrightSkeleton(raw)) {

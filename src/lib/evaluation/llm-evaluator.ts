@@ -25,15 +25,15 @@ export interface EvaluationWithUsage {
 }
 
 async function runSingleEvaluation(
-  requirement: string,
+  originalWorkItem: string,
   generatedOutput: string,
   provider: UiLlmProviderId,
   attachments: MediaAttachment[] = []
 ): Promise<{ run: LlmEvaluationRun; call: LlmCallResult }> {
   const call = await generateQaAnalysis(provider, {
-    input: requirement,
+    input: originalWorkItem,
     systemPrompt: buildEvaluatorSystemPrompt(),
-    userPrompt: buildEvaluatorUserPrompt(requirement, generatedOutput),
+    userPrompt: buildEvaluatorUserPrompt(originalWorkItem, generatedOutput),
     temperature: EVALUATOR_TEMPERATURE,
     attachments,
   });
@@ -45,7 +45,7 @@ async function runSingleEvaluation(
 }
 
 export async function evaluateWithLlm(
-  requirement: string,
+  originalWorkItem: string,
   analysis: QAAnalysis,
   provider: UiLlmProviderId,
   attachments: MediaAttachment[] = []
@@ -57,13 +57,13 @@ export async function evaluateWithLlm(
 
   const results = await Promise.all(
     Array.from({ length: EVALUATION_RUN_COUNT }, () =>
-      runSingleEvaluation(requirement, generatedOutput, provider, attachments)
+      runSingleEvaluation(originalWorkItem, generatedOutput, provider, attachments)
     )
   );
 
   const evaluation = aggregateEvaluationRuns(
     results.map((result) => result.run),
-    requirement,
+    originalWorkItem,
     analysis
   );
   const usage = summarizeLlmUsage(

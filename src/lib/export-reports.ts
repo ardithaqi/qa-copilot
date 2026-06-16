@@ -4,6 +4,7 @@ import {
   hasApiTestSuggestions,
 } from "@/lib/report-display";
 import type { EvaluationResult } from "@/lib/evaluation/types";
+import { COVERAGE_AREA_LABELS } from "@/lib/evaluation/coverage-areas";
 import type { QAAnalysis, QATestCase } from "@/types/qa-analysis";
 import { formatTestCaseCategory } from "@/types/qa-analysis";
 import {
@@ -232,7 +233,7 @@ export function buildPlaywrightSpec(analysis: QAAnalysis): string {
 }
 
 export function buildEvaluationMarkdown(
-  requirement: string,
+  originalWorkItem: string,
   evaluation: EvaluationResult
 ): string {
   const listSection = (title: string, items: string[]) =>
@@ -241,19 +242,21 @@ export function buildEvaluationMarkdown(
   const lines = [
     "# QA Copilot — AI Quality Evaluation",
     "",
-    "## Requirement",
-    requirement,
+    "## Work item",
+    originalWorkItem,
     "",
-    `- **Coverage (median):** ${evaluation.coveragePercent}%`,
-    `- **Accuracy (median):** ${evaluation.accuracyScore}%`,
+    `- **Coverage (final):** ${evaluation.coveragePercent}%`,
+    `- **Coverage (LLM median):** ${evaluation.llmCoverageMedian}%`,
     `- **Coverage (average):** ${evaluation.scores.coverageAverage}%`,
     `- **Coverage range:** ${evaluation.scores.coverageMin}–${evaluation.scores.coverageMax}`,
+    `- **Accuracy (median):** ${evaluation.accuracyScore}%`,
+    `- **Accuracy (average):** ${evaluation.scores.accuracyAverage}%`,
+    `- **Accuracy range:** ${evaluation.scores.accuracyMin}–${evaluation.scores.accuracyMax}`,
     `- **Quality (final):** ${evaluation.qualityScore}`,
-    `- **Quality (LLM median):** ${evaluation.llmQualityMedian}`,
     `- **Quality (average):** ${evaluation.scores.qualityAverage}`,
     `- **Quality range:** ${evaluation.scores.qualityMin}–${evaluation.scores.qualityMax}`,
     `- **Evaluation runs:** ${evaluation.scores.evaluationRuns}`,
-    `- **Hard-check penalty:** ${evaluation.hardCheckPenalty}`,
+    `- **Hard-check coverage penalty:** ${evaluation.hardCheckPenalty}`,
     `- **Method:** ${evaluation.method}`,
     "",
     "## Summary",
@@ -272,12 +275,17 @@ export function buildEvaluationMarkdown(
     }
   }
 
+  if (evaluation.coverageAreaGaps.length > 0) {
+    lines.push("## Coverage area gaps", "");
+    for (const gap of evaluation.coverageAreaGaps) {
+      lines.push(`- **${COVERAGE_AREA_LABELS[gap.area]}**: ${gap.note}`);
+    }
+    lines.push("");
+  }
+
   lines.push(
-    ...listSection("Missing scenarios", evaluation.missingScenarios),
-    ...listSection("Missing edge cases", evaluation.missingEdgeCases),
-    ...listSection("Missing API validations", evaluation.missingApiValidations),
-    ...listSection("Missing risks", evaluation.missingRisks),
     ...listSection("Accuracy issues", evaluation.accuracyIssues),
+    ...listSection("Quality issues", evaluation.qualityIssues),
     ...listSection("Strengths", evaluation.strengths),
     ...listSection("Improvement suggestions", evaluation.improvementSuggestions)
   );

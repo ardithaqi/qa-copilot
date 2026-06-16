@@ -59,11 +59,28 @@ function parseCategory(value: unknown): TestCaseCategory {
     "other",
   ];
   if (allowed.includes(raw as TestCaseCategory)) return raw as TestCaseCategory;
-  if (raw.includes("happy")) return "happy_path";
-  if (raw.includes("negative")) return "negative";
-  if (raw.includes("edge")) return "edge";
-  if (raw.includes("regression")) return "regression";
+  if (raw.includes("happy") || raw.includes("positive") || raw.includes("success")) {
+    return "happy_path";
+  }
+  if (
+    raw.includes("negative") ||
+    raw.includes("validation") ||
+    raw.includes("invalid") ||
+    raw.includes("error") ||
+    raw.includes("failure")
+  ) {
+    return "negative";
+  }
+  if (raw.includes("edge") || raw.includes("double") || raw.includes("rapid")) {
+    return "edge";
+  }
+  if (raw.includes("regression") || raw.includes("compat")) {
+    return "regression";
+  }
   if (raw.includes("repro")) return "reproduction";
+  if (raw.includes("feedback") || raw.includes("toast") || raw.includes("confirm")) {
+    return "happy_path";
+  }
   return "other";
 }
 
@@ -177,8 +194,22 @@ function parseAutomationCandidates(value: unknown): AutomationCandidate[] {
       return {
         scenario,
         priority: normalizeAutomationPriority(asString(obj.priority) || "Medium"),
-        whyAutomate: asString(obj.whyAutomate ?? obj.rationale),
-        whyNotAutomate: asString(obj.whyNotAutomate ?? obj.whyNot),
+        // Support multiple prompt variants:
+        // - preferred schema: automationReason / manualReason
+        // - older schema: whyAutomate / whyNotAutomate
+        // - legacy aliases: rationale / whyNot
+        whyAutomate: asString(
+          obj.whyAutomate ??
+            obj.rationale ??
+            obj.automationReason ??
+            obj.automation_reason
+        ),
+        whyNotAutomate: asString(
+          obj.whyNotAutomate ??
+            obj.whyNot ??
+            obj.manualReason ??
+            obj.manual_reason
+        ),
         layer: asString(obj.layer) || "E2E",
         manualOnly: Boolean(obj.manualOnly),
       };

@@ -37,7 +37,7 @@ Shown in the report:
 5. API test suggestions (when relevant)  
 6. Final QA notes  
 
-Plus **AI quality evaluation** when using Analyze & evaluate (coverage + accuracy issues, gap lists, strengths, suggestions).
+Plus **AI quality evaluation** when using Analyze & evaluate (coverage %, accuracy, quality, coverage area gaps, strengths, suggestions).
 
 ## Downloads
 
