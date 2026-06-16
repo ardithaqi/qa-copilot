@@ -4,6 +4,7 @@ import {
   hasApiTestSuggestions,
 } from "@/lib/report-display";
 import type { EvaluationResult } from "@/lib/evaluation/types";
+import { buildCoverageBreakdown } from "@/lib/evaluation/coverage-breakdown";
 import { COVERAGE_AREA_LABELS } from "@/lib/evaluation/coverage-areas";
 import type { QAAnalysis, QATestCase } from "@/types/qa-analysis";
 import { formatTestCaseCategory } from "@/types/qa-analysis";
@@ -246,9 +247,10 @@ export function buildEvaluationMarkdown(
     originalWorkItem,
     "",
     `- **Coverage (final):** ${evaluation.coveragePercent}%`,
-    `- **Coverage (LLM median):** ${evaluation.llmCoverageMedian}%`,
+    `- **Coverage (base score):** ${evaluation.llmCoverageMedian}%`,
     `- **Coverage (average):** ${evaluation.scores.coverageAverage}%`,
     `- **Coverage range:** ${evaluation.scores.coverageMin}–${evaluation.scores.coverageMax}`,
+    `- **Missing areas adjustment:** −${evaluation.hardCheckPenalty}`,
     `- **Accuracy (median):** ${evaluation.accuracyScore}%`,
     `- **Accuracy (average):** ${evaluation.scores.accuracyAverage}%`,
     `- **Accuracy range:** ${evaluation.scores.accuracyMin}–${evaluation.scores.accuracyMax}`,
@@ -256,7 +258,6 @@ export function buildEvaluationMarkdown(
     `- **Quality (average):** ${evaluation.scores.qualityAverage}`,
     `- **Quality range:** ${evaluation.scores.qualityMin}–${evaluation.scores.qualityMax}`,
     `- **Evaluation runs:** ${evaluation.scores.evaluationRuns}`,
-    `- **Hard-check coverage penalty:** ${evaluation.hardCheckPenalty}`,
     `- **Method:** ${evaluation.method}`,
     "",
     "## Summary",
@@ -264,14 +265,26 @@ export function buildEvaluationMarkdown(
     "",
   ];
 
-  if (evaluation.hardChecks.length > 0) {
-    lines.push("## Hard checks", "");
-    for (const check of evaluation.hardChecks) {
-      lines.push(`### ${check.ruleLabel} — ${check.passed ? "passed" : "gaps found"}`);
-      for (const criterion of check.criteria) {
-        lines.push(`- ${criterion.passed ? "[x]" : "[ ]"} ${criterion.label}`);
+  const breakdown = buildCoverageBreakdown(evaluation);
+  if (breakdown.length > 0) {
+    lines.push("## Coverage breakdown", "");
+    lines.push("These areas explain what influenced the Coverage score.", "");
+    for (const group of breakdown) {
+      lines.push(`### ${group.title}`, "");
+      if (group.covered.length > 0) {
+        lines.push("**Covered:**", "");
+        for (const item of group.covered) {
+          lines.push(`- ✓ ${item}`);
+        }
+        lines.push("");
       }
-      lines.push("");
+      if (group.missing.length > 0) {
+        lines.push("**Missing:**", "");
+        for (const item of group.missing) {
+          lines.push(`- ✕ ${item.label}`, `  ${item.note}`);
+        }
+        lines.push("");
+      }
     }
   }
 

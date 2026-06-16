@@ -1,6 +1,9 @@
-import type { EvaluationResult, HardCheckResult } from "@/lib/evaluation/types";
+"use client";
+
+import { useState } from "react";
+import type { EvaluationResult } from "@/lib/evaluation/types";
+import { buildCoverageBreakdown } from "@/lib/evaluation/coverage-breakdown";
 import { COVERAGE_AREA_LABELS } from "@/lib/evaluation/coverage-areas";
-import { EVALUATOR_TEMPERATURE } from "@/lib/evaluation/constants";
 import { buildEvaluationMarkdown, downloadTextFile } from "@/lib/export-reports";
 
 interface EvaluationResultsProps {
@@ -73,42 +76,75 @@ function CoverageAreaGapList({
   );
 }
 
-function HardCheckPanel({ hardChecks }: { hardChecks: HardCheckResult[] }) {
-  if (hardChecks.length === 0) {
+function CoverageBreakdownPanel({
+  evaluation,
+}: {
+  evaluation: EvaluationResult;
+}) {
+  const [open, setOpen] = useState(true);
+  const groups = buildCoverageBreakdown(evaluation);
+  if (groups.length === 0) {
     return null;
   }
 
   return (
-    <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
-      <h3 className="text-sm font-semibold text-slate-900">Hard checks (deterministic)</h3>
-      <p className="mt-1 text-xs text-slate-500">
-        Thematic keyword checks for known work-item patterns — only themes relevant
-        to the ticket apply. Failed themes reduce coverage, not quality. The LLM
-        evaluator handles finer-grained coverage gaps.
-      </p>
-      <div className="mt-3 space-y-3">
-        {hardChecks.map((check) => (
-          <div key={check.ruleId} className="rounded-md border border-slate-200 p-3">
-            <p className="text-sm font-medium text-slate-900">
-              {check.ruleLabel}{" "}
-              <span
-                className={
-                  check.passed ? "text-emerald-700" : "text-red-700"
-                }
-              >
-                {check.passed ? "· passed" : "· gaps found"}
-              </span>
-            </p>
-            <ul className="mt-2 space-y-1 text-xs text-slate-600">
-              {check.criteria.map((criterion) => (
-                <li key={criterion.label}>
-                  {criterion.passed ? "✓" : "✗"} {criterion.label}
-                </li>
-              ))}
-            </ul>
+    <div className="mt-4 rounded-lg border border-slate-200 bg-white">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="flex w-full items-center gap-2 px-4 py-3 text-left"
+        aria-expanded={open}
+      >
+        <span className="text-xs text-slate-500" aria-hidden>
+          {open ? "▼" : "▶"}
+        </span>
+        <span className="text-sm font-semibold text-slate-900">Coverage breakdown</span>
+      </button>
+      {open ? (
+        <div className="border-t border-slate-200 px-4 pb-4 pt-3">
+          <p className="text-xs text-slate-500">
+            These areas explain what influenced the Coverage score.
+          </p>
+          <div className="mt-3 space-y-4">
+            {groups.map((group) => (
+              <div key={group.title} className="rounded-md border border-slate-200 p-3">
+                <p className="text-sm font-medium text-slate-900">{group.title}</p>
+                {group.covered.length > 0 ? (
+                  <div className="mt-2">
+                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                      Covered
+                    </p>
+                    <ul className="mt-1 space-y-1 text-sm text-slate-700">
+                      {group.covered.map((item) => (
+                        <li key={item} className="text-emerald-800">
+                          ✓ {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {group.missing.length > 0 ? (
+                  <div className={group.covered.length > 0 ? "mt-3" : "mt-2"}>
+                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                      Missing
+                    </p>
+                    <ul className="mt-1 space-y-3 text-sm text-slate-700">
+                      {group.missing.map((item) => (
+                        <li key={item.label}>
+                          <p className="font-medium text-red-800">✕ {item.label}</p>
+                          <p className="mt-0.5 pl-4 text-xs leading-relaxed text-slate-600">
+                            {item.note}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -131,13 +167,13 @@ export default function EvaluationResults({
         <div>
           <h2 className="text-lg font-semibold text-slate-900">AI quality evaluation</h2>
           <p className="mt-1 text-xs text-slate-600">
-            {scores.evaluationRuns} LLM passes (median + average) with fixed rubric,
-            temperature {EVALUATOR_TEMPERATURE}, plus hard checks.
+            {scores.evaluationRuns} evaluation passes (median + average) with a fixed
+            rubric and coverage breakdown.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <div
-            title="How much of the important testing surface was covered? May be lowered by hard checks when keyword coverage criteria fail."
+            title="How much of the important testing surface was covered? Missing areas in the coverage breakdown may lower this score."
             className={`rounded-lg border px-4 py-2 text-center ${scoreTone(evaluation.coveragePercent)}`}
           >
             <p className="text-xs font-semibold uppercase tracking-wide">Coverage</p>
@@ -145,7 +181,8 @@ export default function EvaluationResults({
             <p className="text-xs tabular-nums">
               {coverageAdjusted ? (
                 <>
-                  LLM median {evaluation.llmCoverageMedian}% (−{evaluation.hardCheckPenalty})
+                  Base score {evaluation.llmCoverageMedian}% · Missing areas −
+                  {evaluation.hardCheckPenalty}
                 </>
               ) : (
                 <>
@@ -168,7 +205,7 @@ export default function EvaluationResults({
             </p>
           </div>
           <div
-            title="How useful and well-written is the report? Clarity, prioritization, actionability, deduplication — not missing coverage areas or hard-check failures."
+            title="How useful and well-written is the report? Clarity, prioritization, and actionability — not missing coverage areas."
             className={`rounded-lg border px-4 py-2 text-center ${scoreTone(evaluation.qualityScore)}`}
           >
             <p className="text-xs font-semibold uppercase tracking-wide">Quality</p>
@@ -194,7 +231,7 @@ export default function EvaluationResults({
         {originalWorkItem}
       </p>
 
-      <HardCheckPanel hardChecks={evaluation.hardChecks} />
+      <CoverageBreakdownPanel evaluation={evaluation} />
 
       <p className="mt-4 text-xs text-slate-500">
         Coverage area gaps name weak testing categories — not replacement test

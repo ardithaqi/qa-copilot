@@ -126,9 +126,10 @@ Coverage score + feedback
 - **Input contract** — evaluator receives `originalWorkItem` (user ticket only) + serialized analyzer output; prompts never appear in the report
 - **Rubric** — accuracy/coverage/quality derived from issue counts in `evaluator-prompt.ts` (not free-form guessing)  
 - **Coverage area gaps** — category-based (`validation`, `api`, `edge`, `persistence`, etc.) via `coverage-areas.ts`  
-- **Hard checks** — `hard-checks.ts` thematic keyword rules (context-aware); −5 **coverage** per failed theme (not quality)  
+- **Coverage breakdown** — user-facing covered/missing areas that explain the Coverage score (internal theme checks + LLM gaps)  
+- **Theme checks** — `hard-checks.ts`; −5 **coverage** per missing theme (not quality)  
 - **After analyze** — **Analyze & evaluate** runs `POST /api/evaluate` (3 LLM calls: 1 generate + 2 evaluate). **Analyze** is report-only (1 call).  
-- **Panel** — median + average + range, hard-check breakdown, coverage area gaps (prefer gaps seen in 2+ runs), accuracy/quality issues  
+- **Panel** — median + average + range, coverage breakdown, coverage area gap notes, accuracy/quality issues  
 - **Export** — `evaluation-report.md`
 
 ### Intentional MVP boundaries (today)
@@ -521,5 +522,5 @@ Use this section for future work; remove items when done and note in Changelog.
 | 2026-06-16 | **Analyzer/evaluator split:** coverage-driven generator; evaluator reports coverage areas + accuracy/quality issues. |
 | 2026-06-16 | **Evaluation:** split accuracy vs coverage in AI quality evaluation output. |
 | 2026-06-16 | **Generator prompt:** require more edge-case coverage for async/event-driven inputs in Analyze output. |
-| 2026-06-16 | **Save/persist bugs:** extend happy path expectedResult with feedback when ticket reports silent failure (no separate other case). |
+| 2026-06-16 | **Evaluation UI:** hard checks presented as user-facing Coverage breakdown (covered/missing areas). |
 | 2026-06-16 | **Evaluator:** flag duplication/over-automation as quality issues; do not flag correct reproduction expected results as vague. |

@@ -89,15 +89,26 @@ const HARD_CHECK_RULES: HardCheckRule[] = [
     },
     criteria: [
       {
-        label: "Core success and persistence coverage",
+        label: "Core success flow",
         matches: (h) =>
           includesAny(h, [
-            /(?:save|update|submit).{0,80}(?:persist|refresh|reload|display|shown|visible|correct|remain)/,
-            /persist.{0,60}(?:refresh|save|update|session|navigation|after)/,
-            /refresh.{0,60}(?:persist|remain|correct|display|shown)/,
-            /reproduc/,
             /happy path/,
             /successful save/,
+            /reproduc/,
+            /(?:save|update|submit).{0,80}(?:success|display|shown|visible|correct)/,
+          ]),
+      },
+      {
+        label: "Persistence",
+        matches: (h) =>
+          includesAny(h, [
+            /refresh/,
+            /reload/,
+            /persist/,
+            /remain.{0,30}correct/,
+            /navigate away/,
+            /re-login/,
+            /logout/,
           ]),
       },
       {
