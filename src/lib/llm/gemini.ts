@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { buildGeminiContentParts } from "@/lib/llm/multimodal";
 import type { GenerateQaAnalysisFn } from "@/lib/llm/types";
 
 const DEFAULT_MODEL = "gemini-2.0-flash";
@@ -25,7 +26,8 @@ export const generateQaAnalysis: GenerateQaAnalysisFn = async (params) => {
     systemInstruction: params.systemPrompt,
   });
 
-  const result = await model.generateContent(params.userPrompt);
+  const parts = buildGeminiContentParts(params.userPrompt, params.attachments);
+  const result = await model.generateContent(parts);
   const text = result.response.text();
 
   if (!text?.trim()) {

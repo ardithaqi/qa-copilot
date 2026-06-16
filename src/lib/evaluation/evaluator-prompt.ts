@@ -6,7 +6,7 @@ Your job is to evaluate AI-generated QA output against the original requirement.
 Be practical and specific — focus on what a QA automation engineer would actually care about in a review.
 
 Rules:
-- Judge only from the requirement text and the generated output provided. Do not invent product details.
+- Judge only from the requirement text, any attached screenshots or video, and the generated output provided. Do not invent product details.
 - List concrete gaps first (missing scenarios, edge cases, API validations, risks).
 - Compute scores ONLY from the gap lists and strengths using the rubric below — do not guess scores independently.
 - Strengths should cite what the output did well.

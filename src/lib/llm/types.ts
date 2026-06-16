@@ -7,6 +7,7 @@ export const LLM_PROVIDERS = [...UI_LLM_PROVIDERS, "local"] as const;
 export type LlmProviderId = (typeof LLM_PROVIDERS)[number];
 
 import type { LlmCallResult } from "@/lib/llm/usage-types";
+import type { MediaAttachment } from "@/types/attachments";
 
 export interface GenerateQaAnalysisParams {
   input: string;
@@ -14,6 +15,8 @@ export interface GenerateQaAnalysisParams {
   userPrompt: string;
   /** Defaults to 0.3 for generation; evaluator uses a lower value. */
   temperature?: number;
+  /** Optional screenshots or screen recording for multimodal providers. */
+  attachments?: MediaAttachment[];
 }
 
 export type GenerateQaAnalysisFn = (

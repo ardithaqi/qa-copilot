@@ -115,10 +115,11 @@ ${AGENT_STAGES}
 
 ## Global rules
 1. Ground every statement in the user input. Use the ticket's vocabulary.
-2. Do not output an assumptions section or ASSUMPTION-prefixed items. Put unknowns and open questions only in missingOrUnclearInformation[].
-3. List unknowns in missingOrUnclearInformation[] — do not guess.
-4. Complete automationCandidates before playwrightTestSkeletons — Playwright output must reflect those candidates.
-5. Do not use page.locator('text=...') unless that exact visible text is in the input.
+2. When screenshots or video are attached, use visible UI states, labels, and flows from the media together with the text. Do not invent details not shown.
+3. Do not output an assumptions section or ASSUMPTION-prefixed items. Put unknowns and open questions only in missingOrUnclearInformation[].
+4. List unknowns in missingOrUnclearInformation[] — do not guess.
+5. Complete automationCandidates before playwrightTestSkeletons — Playwright output must reflect those candidates.
+6. Do not use page.locator('text=...') unless that exact visible text is in the input.
 
 ${JSON_SCHEMA}
 ${PLAYWRIGHT_SKELETON_RULES}

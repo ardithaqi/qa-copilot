@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import AnalysisResults from "@/components/AnalysisResults";
+import MediaAttachmentsInput from "@/components/MediaAttachmentsInput";
+import { filesToMediaAttachments } from "@/lib/attachments/client";
 import { EVALUATION_RUN_COUNT } from "@/lib/evaluation/constants";
 import RunUsageBanner from "@/components/RunUsageBanner";
 import { mergeUsageSummaries } from "@/lib/llm";
@@ -17,6 +19,7 @@ import type {
   AnalyzeSuccessResponse,
   QAAnalysis,
 } from "@/types/qa-analysis";
+import type { MediaAttachment } from "@/types/attachments";
 import {
   WORK_ITEM_TYPE_SELECTIONS,
   WORK_ITEM_TYPE_LABELS,
@@ -49,6 +52,8 @@ export default function Home() {
   );
   const [error, setError] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
 
   async function handleAnalyze(withEvaluation: boolean) {
     const trimmed = input.trim();
@@ -57,6 +62,33 @@ export default function Home() {
 
     if (!trimmed) {
       setValidationError("Please paste a work item before analyzing.");
+      return;
+    }
+
+    let attachments: MediaAttachment[] = [];
+    try {
+      attachments = await filesToMediaAttachments(imageFiles, videoFile);
+    } catch (err) {
+      setValidationError(
+        err instanceof Error ? err.message : "Invalid attachment."
+      );
+      return;
+    }
+
+    if (attachments.length > 0 && provider === "groq") {
+      setValidationError(
+        "Groq does not support images or video. Select OpenAI (images) or Gemini (images and video)."
+      );
+      return;
+    }
+
+    if (
+      attachments.some((item) => item.kind === "video") &&
+      provider === "openai"
+    ) {
+      setValidationError(
+        "Video requires Gemini. Use an image or switch provider."
+      );
       return;
     }
 
@@ -78,6 +110,7 @@ export default function Home() {
             input: trimmed,
             provider,
             workItemType,
+            attachments,
           }),
         });
       } catch {
@@ -121,6 +154,7 @@ export default function Home() {
           analysis: successData.analysis,
           requirement: trimmed,
           provider,
+          attachments,
         }),
       });
 
@@ -231,6 +265,15 @@ export default function Home() {
           rows={14}
           className="w-full resize-y rounded-lg border border-slate-300 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
           disabled={loading}
+        />
+
+        <MediaAttachmentsInput
+          imageFiles={imageFiles}
+          videoFile={videoFile}
+          onImageFilesChange={setImageFiles}
+          onVideoFileChange={setVideoFile}
+          disabled={loading}
+          provider={provider}
         />
 
         {(validationError || error) && (

@@ -1,5 +1,6 @@
 import type { UiLlmProviderId } from "@/lib/llm/types";
 import type { LlmUsageSummary } from "@/lib/llm/usage-types";
+import type { MediaAttachment } from "@/types/attachments";
 import type {
   ConfidenceLevel,
   WorkItemType,
@@ -88,6 +89,7 @@ export interface AnalyzeRequest {
   input: string;
   provider: UiLlmProviderId;
   workItemType: WorkItemTypeSelection;
+  attachments?: MediaAttachment[];
 }
 
 export interface AnalyzeSuccessResponse {

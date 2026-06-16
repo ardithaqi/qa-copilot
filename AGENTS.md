@@ -4,7 +4,8 @@
 > **For humans:** Paste into a new Cursor chat: *“Read `AGENTS.md` in this workspace and continue from there.”*
 
 **Last updated:** 2026-06-03  
-**Workspace path:** `/Users/ardi/Desktop/test` (public repo; clone path may differ)  
+**Repo:** [github.com/ardithaqi/qa-copilot](https://github.com/ardithaqi/qa-copilot) (public)  
+**Workspace path:** local clone path may differ (e.g. `qa-copilot` on disk)  
 **Do not use:** old copies under `Desktop/oleaburger/` or other stale clones — this tree is the canonical standalone repo
 
 ---
@@ -24,11 +25,91 @@ If something in this doc conflicts with the code, **the code wins** — fix the 
 
 ## What this project is
 
-**Description:** QA Copilot, an AI Test Design Agent that analyzes requirements, bugs, enhancements, and technical changes to generate QA strategies, risk assessments, automation candidates, and Playwright test skeletons.
+**Description:** QA Copilot is an AI-assisted QA platform. Today it is a **test design generator**; the goal is to evolve it into a platform that both **generates and evaluates** QA outputs.
 
 Single-page **Next.js** app. The user pastes a work item (Jira/Azure ticket, bug, user story, acceptance criteria, notes), picks a **work item type** and **LLM provider**, and gets a structured QA report with downloadable markdown/TypeScript exports. API keys stay server-side only.
 
-### Current state (2026-06-02)
+**North star:** Transform QA Copilot from an AI generator into an AI-assisted quality platform that can both generate and evaluate QA outputs.
+
+---
+
+## Vision & roadmap
+
+### Current goal (generation — shipped)
+
+Accept a requirement or feature description and **generate**:
+
+- Test scenarios  
+- API test ideas  
+- Edge cases  
+- Risk analysis  
+- Playwright automation recommendations  
+- Playwright code skeletons  
+- Missing or unclear information (gaps; no separate Assumptions section in UI)
+
+The current system focuses mainly on **generation**.
+
+### Evaluation (LLM judge — shipped)
+
+After generation, a **second LLM pass** evaluates output quality:
+
+- Coverage % and overall quality score  
+- Missing scenarios, edge cases, API validations, risks  
+- Strengths and improvement suggestions  
+- `POST /api/evaluate` — `{ analysis, requirement, provider }` → `evaluateWithLlm()`  
+- UI: **AI quality evaluation** panel after every successful analyze (two LLM calls total)  
+- Export: `evaluation-report.md`  
+
+**Not yet:** quality dashboard, persisted history, CI integration, batch regression runner.
+
+### Target architecture
+
+```
+Requirement
+    ↓
+Generator LLM          ← POST /api/analyze
+    ↓
+Generated Output
+    ↓
+Evaluator LLM          ← evaluateWithLlm() + POST /api/evaluate
+    ↓
+Coverage score + feedback
+```
+
+**Example**
+
+| | |
+| - | - |
+| **Input** | “User can reset password via email.” |
+| **Generated** | Valid email · Invalid email · Empty email · Expired link |
+| **Evaluator** | Coverage: 80% · **Missing:** Reused link scenario · Suggestions: add rate-limit test |
+
+### Evaluation approach
+
+**LLM-as-judge (current):** a second prompt compares serialized QA output against the original requirement. Returns structured JSON — coverage %, quality score, gap lists, strengths, suggestions. Uses the same provider infrastructure as generation (`generateQaAnalysis`).
+
+**Why not golden dataset:** manual `expectedCoverage` lists do not scale; the LLM judge adapts to any requirement without maintaining fixture files.
+
+### Constraints for evaluation work
+
+- Keep explanations simple; focus on practical QA automation use cases.  
+- Realistic for a QA Automation Engineer (coverage gaps you would actually care about in review).  
+- Evaluation is additive — runs after generation; uses one extra LLM call per analyze.  
+- Evaluator must not invent product details beyond the requirement + generated output.
+
+### Key concepts (interview / design language)
+
+| Term | Meaning |
+| ---- | ------- |
+| **LLM-as-judge** | Second model pass that scores generated QA output on coverage, completeness, and gaps |
+| **Evaluation framework** | Scores outputs on coverage, completeness, relevance, consistency, missing scenarios |
+| **AI regression** | Output quality drops after prompt, model, or logic changes |
+
+---
+
+## Current state (2026-06-03)
+
+### Generation
 
 - **10 report sections** (no Assumptions section; gaps go in Missing or Unclear Information).
 - **Test Cases** — scenarios with plain metadata line: `#01 · Type · Priority` (no colored badges).
@@ -36,15 +117,26 @@ Single-page **Next.js** app. The user pastes a work item (Jira/Azure ticket, bug
 - **Playwright** — prompt + `resolvePlaywrightSkeleton()` in `src/lib/playwright-skeleton.ts`: aligns tests to automation candidates; replaces generic `TODO: feature name` placeholders; every **High** priority automatable candidate gets a test.
 - **Exports** — `test-cases.md`, `{scenario}.spec.ts` filename from primary automation scenario.
 - **Secrets** — `.env.local` gitignored; BYOK per provider; see README **API keys (required)**.
+- **Optional media** — up to 3 screenshots (5 MB each) or one video (20 MB, Gemini only); base64 in JSON to `/api/analyze` and `/api/evaluate`. Groq = text only; OpenAI = images; Gemini = images + video.
 
-### Intentional MVP boundaries
+### Evaluation (LLM judge + hardened scoring)
+
+- **`src/lib/evaluation/`** — evaluator prompts, 2 parallel LLM passes (temp 0.1), median/average aggregation, hard checks
+- **Rubric** — scores derived from gap counts in `evaluator-prompt.ts` (not free-form guessing)
+- **Hard checks** — `hard-checks.ts` keyword rules for password-reset and image-upload patterns; −7 quality per failed criterion
+- **After analyze** — **Analyze & evaluate** runs `POST /api/evaluate` (3 LLM calls: 1 generate + 2 evaluate). **Analyze** is report-only (1 call).
+- **Panel** — median + average + range, hard-check breakdown, gap lists (prefer gaps seen in 2+ runs)
+- **Export** — `evaluation-report.md`
+
+### Intentional MVP boundaries (today)
 
 | In scope | Out of scope (unless user asks) |
 | -------- | ------------------------------- |
-| One page, paste + analyze | Database, auth, file upload |
+| One page, paste + analyze (+ optional screenshots/video) | Database, auth, persistent file storage |
 | Server-side LLM only | Jira/Azure/Confluence integrations |
 | Multi-provider (Groq, OpenAI, Gemini) | Exposing API keys to the browser |
 | Browser download exports | Inventing real routes/selectors/APIs |
+| Generation + LLM evaluation | Dashboard, CI gates, batch regression runner (see Backlog) |
 
 ---
 
@@ -76,7 +168,7 @@ Do **not** run `npm run build` while `npm run dev` is running (stale `.next` →
 
 - This repo ships **no API keys**. Each user/deployer adds their own.
 - **Bring your own key** for the LLM provider selected in the UI (Groq, OpenAI, or Gemini). Only that provider’s env var must be set.
-- Keys are read in **`src/lib/llm/*`** and **`POST /api/analyze`** only — never sent to the browser.
+- Keys are read in **`src/lib/llm/*`**, **`POST /api/analyze`**, and **`POST /api/evaluate`** only — never sent to the browser.
 - **Never commit** `.env.local` (covered by `.gitignore` → `.env*.local`). Safe to commit `.env.local.example` (placeholders).
 - Before pushing to GitHub: `git status` must not list `.env.local`. Rotate keys if they were ever committed.
 
@@ -101,7 +193,19 @@ Only the key for the **selected provider** must be set for that run. For product
 1. **Work item type** (radio, default **Auto-detect**):
    - `auto` | `feature` | `bug` | `enhancement` | `technical_change`
 2. **AI provider** (radio): `groq` | `openai` | `gemini`
-3. **Textarea** — requirement / ticket text
+3. **Textarea** — requirement / ticket text  
+4. **Screenshots or video (optional)** — up to 3 images or 1 video; sent as base64 with analyze/evaluate requests  
+5. **Analyze** — generate report only (1 LLM call)  
+6. **Analyze & evaluate** — generate + quality evaluation (3 LLM calls)  
+
+**Media provider support:** Groq — text only (client blocks attachments). OpenAI — images. Gemini — images and video.
+
+### Evaluation flow (Analyze & evaluate button)
+
+1. User clicks **Analyze** → `POST /api/analyze` (generator LLM).  
+2. Client calls `POST /api/evaluate` with `{ analysis, requirement, provider, attachments? }`.  
+3. `evaluateWithLlm()` serializes the report, sends evaluator prompt, parses JSON scores.  
+4. UI shows **AI quality evaluation** panel above report sections; user can download `evaluation-report.md`.
 
 ### Agent workflow (prompt-level, single LLM call)
 
@@ -173,6 +277,7 @@ Defined in `src/lib/prompt/strategies.ts` and injected via `buildUserPrompt()`:
 | `automation-candidates.md` | Automation recommendations |
 | `{test-scenario}.spec.ts` | Playwright skeleton (filename from primary automation scenario / test title, kebab-case) |
 | `api-test-suggestions.md` | API ideas |
+| `evaluation-report.md` | LLM quality evaluation (after every analyze; from evaluation panel) |
 
 ---
 
@@ -186,7 +291,15 @@ Request body:
 {
   "input": "string (required)",
   "provider": "groq | openai | gemini",
-  "workItemType": "auto | feature | bug | enhancement | technical_change"
+  "workItemType": "auto | feature | bug | enhancement | technical_change",
+  "attachments": [
+    {
+      "kind": "image | video",
+      "mimeType": "string",
+      "fileName": "string",
+      "dataBase64": "string"
+    }
+  ]
 }
 ```
 
@@ -202,9 +315,46 @@ Success:
 Error: `{ "error": "user-friendly message" }` with 400 / 502 / 500 as appropriate.
 
 **Route:** `src/app/api/analyze/route.ts`  
-**Flow:** validate → `generateAnalysisJson(input, provider, workItemType)` → `parseAnalysisResponse(raw, workItemType)` (includes `resolvePlaywrightSkeleton`) → JSON
+**Flow:** validate → `generateAnalysis(input, provider, workItemType, attachments?)` → `parseAnalysisResponse` (includes `resolvePlaywrightSkeleton`) → JSON
 
 **`QAAnalysis`** (`src/types/qa-analysis.ts`): no `assumptions` field. Legacy LLM `assumptions` in JSON are ignored.
+
+**`POST /api/evaluate`**
+
+Request body:
+
+```json
+{
+  "analysis": { /* QAAnalysis */ },
+  "requirement": "original requirement text (required)",
+  "provider": "groq | openai | gemini",
+  "attachments": [ /* same shape as analyze; optional */ ]
+}
+```
+
+Success:
+
+```json
+{
+  "evaluation": {
+    "coveragePercent": 80,
+    "qualityScore": 75,
+    "summary": "Overall assessment…",
+    "missingScenarios": ["Reused reset link"],
+    "missingEdgeCases": [],
+    "missingApiValidations": [],
+    "missingRisks": [],
+    "strengths": ["Clear negative email tests"],
+    "improvementSuggestions": ["Add rate-limit scenario"],
+    "method": "llm"
+  },
+  "requirement": "User can reset password via email",
+  "provider": "groq"
+}
+```
+
+**Route:** `src/app/api/evaluate/route.ts`  
+**Flow:** validate `analysis` + `requirement` → `evaluateWithLlm()` → `parseEvaluationResponse()` → JSON
 
 ---
 
@@ -220,17 +370,29 @@ QA Copilot/
 ├── next.config.ts
 └── src/
     ├── app/
-    │   ├── page.tsx                    # UI: selectors, textarea, analyze
+    │   ├── page.tsx                      # UI: analyze + auto LLM evaluation
     │   ├── layout.tsx
     │   ├── globals.css
-    │   └── api/analyze/route.ts        # POST handler
+    │   └── api/
+    │       ├── analyze/route.ts
+    │       └── evaluate/route.ts
     ├── components/
-    │   ├── AnalysisResults.tsx         # 10 sections display
-    │   └── ExportDownloads.tsx         # download buttons
+    │   ├── AnalysisResults.tsx           # report + evaluation panel
+    │   ├── EvaluationResults.tsx
+    │   ├── ExportDownloads.tsx
+    │   └── MediaAttachmentsInput.tsx
     ├── types/
-    │   ├── qa-analysis.ts              # QAAnalysis, QATestCase, API types
-    │   └── work-item.ts                # work item enums + labels
+    │   ├── qa-analysis.ts
+    │   ├── attachments.ts
+    │   └── work-item.ts
     └── lib/
+        ├── evaluation/
+        │   ├── types.ts
+        │   ├── evaluator-prompt.ts
+        │   ├── serialize-analysis.ts
+        │   ├── llm-evaluator.ts
+        │   ├── parse-evaluation.ts
+        │   └── index.ts
         ├── prompt/
         │   ├── agent-prompt.ts         # buildSystemPrompt, buildUserPrompt
         │   ├── strategies.ts           # per-type strategy text
@@ -238,11 +400,16 @@ QA Copilot/
         ├── llm/
         │   ├── types.ts                # UiLlmProviderId, UI_LLM_PROVIDERS
         │   ├── index.ts                # generateQaAnalysis(provider, params)
+        │   ├── multimodal.ts           # OpenAI vision + Gemini inline parts
         │   ├── openai-compatible.ts    # shared chat completions + JSON mode
         │   ├── groq.ts
         │   ├── openai.ts
         │   ├── gemini.ts               # @google/generative-ai
         │   └── local.ts                # stub — not in UI yet
+        ├── attachments/
+        │   ├── validate.ts             # parse, size/type checks, provider rules
+        │   ├── client.ts               # browser File → base64
+        │   └── index.ts
         ├── generate-analysis.ts        # wires prompt + llm
         ├── parse-analysis.ts           # JSON → QAAnalysis (+ legacy fields)
         ├── analysis-errors.ts          # friendly error messages
@@ -256,6 +423,7 @@ QA Copilot/
 - **Structured JSON** from LLM; parser tolerates legacy field names (`happyPathTestCases`, etc.).
 - **No API keys in frontend** — only `provider` id is sent from browser.
 - **Playwright reliability** — server-side fallback when LLM returns generic skeletons.
+- **LLM-as-judge evaluation** — second `generateQaAnalysis` call with evaluator prompts; runs after every analyze.
 
 ---
 
@@ -282,12 +450,27 @@ QA Copilot/
 
 Use this section for future work; remove items when done and note in Changelog.
 
+### Evaluation (future)
+
+- [x] **LLM evaluator** — `evaluateWithLlm()`, `/api/evaluate`, evaluation UI panel  
+- [x] **Evaluation reports** — `evaluation-report.md` download  
+- [ ] **Quality dashboard** — scores over time  
+- [ ] **Regression tracking** — compare prompt / model versions on saved requirements (baseline storage)  
+- [ ] **Prompt version comparison** — tag prompts, diff scores across versions  
+- [ ] **Model comparison** — same requirement, multiple providers, side-by-side scores  
+- [ ] **AI output history** — persist past analyses + evaluations for trend view  
+- [ ] **Hallucination detection** — flag invented routes, APIs, selectors vs input  
+- [ ] **Coverage trend tracking** — chart scores across runs  
+- [ ] **CI/CD integration** — fail build or warn on quality drop vs baseline  
+- [ ] **Batch regression runner** — re-run a saved requirement set without manual fixtures  
+
+### Other
+
 - [ ] **Local Llama / Ollama** — `src/lib/llm/local.ts` exists; add UI provider + env (`OLLAMA_BASE_URL`, `OLLAMA_MODEL`) when requested  
 - [ ] **Automated tests** — none yet (no Jest/Playwright test suite for the app itself)  
 - [ ] **Streaming responses** — analyze is single blocking JSON response  
 - [ ] **Rate limiting / usage caps** — app-level limits not implemented (rely on provider quotas)  
-- [ ] **Persist history** — no saved analyses  
-- [ ] **Initial git commit** — if user wants version control  
+- [ ] **Persist history** — no saved analyses (overlaps with eval backlog)  
 
 ---
 
@@ -300,7 +483,8 @@ Use this section for future work; remove items when done and note in Changelog.
 | Generic Playwright (`TODO: feature name`) | Re-analyze; parser should replace via `resolvePlaywrightSkeleton` — if still generic, check `automationCandidates` empty |
 | `Cannot find module './331.js'` | Stale `.next` after `npm run build` during `npm run dev` — `rm -rf .next`, restart dev |
 | Env change ignored | Dev server not restarted |
-| OpenAI billing from Kosovo | ChatGPT ≠ API billing; separate platform.openai.com credits |
+| Groq + screenshot attached | Groq has no vision — switch to OpenAI or Gemini |
+| Video with OpenAI selected | Video requires Gemini |
 
 ---
 
@@ -308,6 +492,12 @@ Use this section for future work; remove items when done and note in Changelog.
 
 | Date | Change |
 | ---- | ------ |
+| 2026-06-03 | **Optional media:** screenshots (OpenAI/Gemini) or video (Gemini); `MediaAttachmentsInput`, `src/lib/attachments/`, multimodal LLM wiring. |
+| 2026-06-03 | **Usage UI:** collapsible Usage details after runs; server `logUsageSummary` for operators. |
+| 2026-06-03 | **Hardened evaluation:** temp 0.1, fixed rubric, multi-run median/average, hard checks + penalty. |
+| 2026-06-03 | **Evaluation → LLM judge:** replaced golden dataset / deterministic scorer with `evaluateWithLlm()`; removed `/api/evaluate/dataset` and golden dataset files. |
+| 2026-06-03 | **Evaluation (initial):** golden dataset + deterministic scorer (later replaced by LLM judge). |
+| 2026-06-03 | **Vision:** generator → generator + evaluator; golden dataset, Option 1/2 eval, target architecture, eval backlog. Repo URL; removed stale “initial git commit” backlog item. |
 | 2026-06-03 | Renamed project from QA Architect back to **QA Copilot** (UI, docs, `package.json` name). |
 | 2026-06-02 | **AGENTS.md full sync:** current state, API keys/public repo, Playwright pipeline, workspace path, git publish, common issues; Test Cases UI metadata. |
 | 2026-06-02 | README: API keys (required), BYOK, do not commit `.env.local`. |

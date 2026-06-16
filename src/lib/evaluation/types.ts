@@ -1,5 +1,6 @@
 import type { UiLlmProviderId } from "@/lib/llm/types";
 import type { LlmUsageSummary } from "@/lib/llm/usage-types";
+import type { MediaAttachment } from "@/types/attachments";
 import type { QAAnalysis } from "@/types/qa-analysis";
 
 export interface LlmEvaluationRun {
@@ -55,6 +56,7 @@ export interface EvaluateRequest {
   analysis: QAAnalysis;
   requirement: string;
   provider: UiLlmProviderId;
+  attachments?: MediaAttachment[];
 }
 
 export interface EvaluateSuccessResponse {

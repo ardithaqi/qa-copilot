@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { buildOpenAIUserContent } from "@/lib/llm/multimodal";
 import type { GenerateQaAnalysisParams } from "@/lib/llm/types";
 import type { LlmCallResult } from "@/lib/llm/usage-types";
 import type { UiLlmProviderId } from "@/lib/llm/types";
@@ -26,7 +27,10 @@ export async function generateWithOpenAICompatible(
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: params.systemPrompt },
-        { role: "user", content: params.userPrompt },
+        {
+          role: "user",
+          content: buildOpenAIUserContent(params.userPrompt, params.attachments),
+        },
       ],
     });
   } catch (error) {

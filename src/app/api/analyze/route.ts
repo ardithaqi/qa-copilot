@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { parseAttachmentsFromBody, validateAttachments } from "@/lib/attachments";
 import { toUserFacingAnalysisError } from "@/lib/analysis-errors";
 import { generateAnalysis } from "@/lib/generate-analysis";
 import { assertUiProviderSupported, logUsageSummary, summarizeLlmUsage } from "@/lib/llm";
@@ -59,7 +60,23 @@ export async function POST(request: Request) {
       );
     }
 
-    const llmResult = await generateAnalysis(input, provider, workItemType);
+    let attachments;
+    try {
+      attachments = parseAttachmentsFromBody(body.attachments);
+      validateAttachments(attachments);
+    } catch (error) {
+      return NextResponse.json(
+        { error: toUserFacingAnalysisError(error) },
+        { status: 400 }
+      );
+    }
+
+    const llmResult = await generateAnalysis(
+      input,
+      provider,
+      workItemType,
+      attachments
+    );
     const analysis = parseAnalysisResponse(llmResult.content, workItemType);
     const usage = summarizeLlmUsage([llmResult], provider);
     logUsageSummary("analyze", usage);
@@ -68,7 +85,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Analyze API error:", error);
     const message = toUserFacingAnalysisError(error, provider);
-    const status = /before analyzing|Invalid request|not supported|workItemType/i.test(
+    const status = /before analyzing|Invalid request|not supported|workItemType|attach|image|video|Groq does not|requires Gemini/i.test(
       message
     )
       ? 400

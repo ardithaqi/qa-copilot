@@ -22,6 +22,14 @@ export function toUserFacingAnalysisError(
     return message.replace(/^UNSUPPORTED_PROVIDER:\s*/i, "");
   }
 
+  if (/ATTACHMENTS_INVALID:/i.test(message)) {
+    return message.replace(/^ATTACHMENTS_INVALID:\s*/i, "");
+  }
+
+  if (/ATTACHMENTS_PROVIDER:/i.test(message)) {
+    return message.replace(/^ATTACHMENTS_PROVIDER:\s*/i, "");
+  }
+
   if (/LOCAL_LLM_NOT_AVAILABLE/i.test(message)) {
     return "Local Llama/Ollama is not available yet. Please select Groq, OpenAI, or Gemini.";
   }

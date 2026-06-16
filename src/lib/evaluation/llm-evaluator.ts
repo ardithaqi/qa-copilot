@@ -1,3 +1,7 @@
+import {
+  validateAttachments,
+  validateAttachmentsForProvider,
+} from "@/lib/attachments";
 import { aggregateEvaluationRuns } from "@/lib/evaluation/aggregate-evaluation";
 import {
   EVALUATION_RUN_COUNT,
@@ -12,6 +16,7 @@ import type { EvaluationResult, LlmEvaluationRun } from "@/lib/evaluation/types"
 import { serializeAnalysisForEvaluation } from "@/lib/evaluation/serialize-analysis";
 import { generateQaAnalysis, summarizeLlmUsage, type UiLlmProviderId } from "@/lib/llm";
 import type { LlmCallResult, LlmUsageSummary } from "@/lib/llm/usage-types";
+import type { MediaAttachment } from "@/types/attachments";
 import type { QAAnalysis } from "@/types/qa-analysis";
 
 export interface EvaluationWithUsage {
@@ -22,13 +27,15 @@ export interface EvaluationWithUsage {
 async function runSingleEvaluation(
   requirement: string,
   generatedOutput: string,
-  provider: UiLlmProviderId
+  provider: UiLlmProviderId,
+  attachments: MediaAttachment[] = []
 ): Promise<{ run: LlmEvaluationRun; call: LlmCallResult }> {
   const call = await generateQaAnalysis(provider, {
     input: requirement,
     systemPrompt: buildEvaluatorSystemPrompt(),
     userPrompt: buildEvaluatorUserPrompt(requirement, generatedOutput),
     temperature: EVALUATOR_TEMPERATURE,
+    attachments,
   });
 
   return {
@@ -40,13 +47,17 @@ async function runSingleEvaluation(
 export async function evaluateWithLlm(
   requirement: string,
   analysis: QAAnalysis,
-  provider: UiLlmProviderId
+  provider: UiLlmProviderId,
+  attachments: MediaAttachment[] = []
 ): Promise<EvaluationWithUsage> {
+  validateAttachments(attachments);
+  validateAttachmentsForProvider(attachments, provider);
+
   const generatedOutput = serializeAnalysisForEvaluation(analysis);
 
   const results = await Promise.all(
     Array.from({ length: EVALUATION_RUN_COUNT }, () =>
-      runSingleEvaluation(requirement, generatedOutput, provider)
+      runSingleEvaluation(requirement, generatedOutput, provider, attachments)
     )
   );
 
