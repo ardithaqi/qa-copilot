@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { toUserFacingAnalysisError } from "@/lib/analysis-errors";
-import { generateAnalysisJson } from "@/lib/generate-analysis";
-import { assertUiProviderSupported } from "@/lib/llm";
+import { generateAnalysis } from "@/lib/generate-analysis";
+import { assertUiProviderSupported, logUsageSummary, summarizeLlmUsage } from "@/lib/llm";
 import { parseAnalysisResponse } from "@/lib/parse-analysis";
 import type { AnalyzeRequest, UiLlmProviderId } from "@/types/qa-analysis";
 import {
@@ -59,9 +59,12 @@ export async function POST(request: Request) {
       );
     }
 
-    const content = await generateAnalysisJson(input, provider, workItemType);
-    const analysis = parseAnalysisResponse(content, workItemType);
-    return NextResponse.json({ analysis, provider });
+    const llmResult = await generateAnalysis(input, provider, workItemType);
+    const analysis = parseAnalysisResponse(llmResult.content, workItemType);
+    const usage = summarizeLlmUsage([llmResult], provider);
+    logUsageSummary("analyze", usage);
+
+    return NextResponse.json({ analysis, provider, usage });
   } catch (error) {
     console.error("Analyze API error:", error);
     const message = toUserFacingAnalysisError(error, provider);

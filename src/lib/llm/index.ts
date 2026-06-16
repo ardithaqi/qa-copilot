@@ -8,6 +8,7 @@ import type {
   LlmProviderId,
   UiLlmProviderId,
 } from "@/lib/llm/types";
+import type { LlmCallResult } from "@/lib/llm/usage-types";
 import { isUiLlmProvider, UI_LLM_PROVIDERS } from "@/lib/llm/types";
 
 const providers: Record<LlmProviderId, GenerateQaAnalysisFn> = {
@@ -30,7 +31,7 @@ export function assertUiProviderSupported(
 export async function generateQaAnalysis(
   provider: UiLlmProviderId,
   params: GenerateQaAnalysisParams
-): Promise<string> {
+): Promise<LlmCallResult> {
   return providers[provider](params);
 }
 
@@ -41,3 +42,17 @@ export {
   type UiLlmProviderId,
   type LlmProviderId,
 };
+export {
+  estimateCostUsd,
+  formatEstimatedCost,
+  formatTokenCount,
+  formatUsageSummaryLine,
+  logUsageSummary,
+  mergeUsageSummaries,
+  summarizeLlmUsage,
+} from "@/lib/llm/usage-cost";
+export type {
+  LlmCallResult,
+  LlmTokenUsage,
+  LlmUsageSummary,
+} from "@/lib/llm/usage-types";

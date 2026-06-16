@@ -1,4 +1,5 @@
 import { resolvePlaywrightSkeleton } from "@/lib/playwright-skeleton";
+import type { EvaluationResult } from "@/lib/evaluation/types";
 import type { QAAnalysis, QATestCase } from "@/types/qa-analysis";
 import { formatTestCaseCategory } from "@/types/qa-analysis";
 import {
@@ -215,6 +216,58 @@ export function buildPlaywrightSpec(analysis: QAAnalysis): string {
     resolvePlaywrightSkeleton(analysis)
   );
   return skeleton.trim() || "// No Playwright skeleton generated.\n";
+}
+
+export function buildEvaluationMarkdown(
+  requirement: string,
+  evaluation: EvaluationResult
+): string {
+  const listSection = (title: string, items: string[]) =>
+  items.length > 0 ? [`## ${title}`, ...items.map((item) => `- ${item}`), ""] : [];
+
+  const lines = [
+    "# QA Copilot — AI Quality Evaluation",
+    "",
+    "## Requirement",
+    requirement,
+    "",
+    `- **Coverage (median):** ${evaluation.coveragePercent}%`,
+    `- **Coverage (average):** ${evaluation.scores.coverageAverage}%`,
+    `- **Coverage range:** ${evaluation.scores.coverageMin}–${evaluation.scores.coverageMax}`,
+    `- **Quality (final):** ${evaluation.qualityScore}`,
+    `- **Quality (LLM median):** ${evaluation.llmQualityMedian}`,
+    `- **Quality (average):** ${evaluation.scores.qualityAverage}`,
+    `- **Quality range:** ${evaluation.scores.qualityMin}–${evaluation.scores.qualityMax}`,
+    `- **Evaluation runs:** ${evaluation.scores.evaluationRuns}`,
+    `- **Hard-check penalty:** ${evaluation.hardCheckPenalty}`,
+    `- **Method:** ${evaluation.method}`,
+    "",
+    "## Summary",
+    evaluation.summary,
+    "",
+  ];
+
+  if (evaluation.hardChecks.length > 0) {
+    lines.push("## Hard checks", "");
+    for (const check of evaluation.hardChecks) {
+      lines.push(`### ${check.ruleLabel} — ${check.passed ? "passed" : "gaps found"}`);
+      for (const criterion of check.criteria) {
+        lines.push(`- ${criterion.passed ? "[x]" : "[ ]"} ${criterion.label}`);
+      }
+      lines.push("");
+    }
+  }
+
+  lines.push(
+    ...listSection("Missing scenarios", evaluation.missingScenarios),
+    ...listSection("Missing edge cases", evaluation.missingEdgeCases),
+    ...listSection("Missing API validations", evaluation.missingApiValidations),
+    ...listSection("Missing risks", evaluation.missingRisks),
+    ...listSection("Strengths", evaluation.strengths),
+    ...listSection("Improvement suggestions", evaluation.improvementSuggestions)
+  );
+
+  return lines.join("\n").trim() + "\n";
 }
 
 export type ExportFileId =

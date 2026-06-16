@@ -1,10 +1,17 @@
 import OpenAI from "openai";
 import type { GenerateQaAnalysisParams } from "@/lib/llm/types";
+import type { LlmCallResult } from "@/lib/llm/usage-types";
+import type { UiLlmProviderId } from "@/lib/llm/types";
 
 export async function generateWithOpenAICompatible(
   params: GenerateQaAnalysisParams,
-  options: { apiKey: string; baseURL?: string; model: string }
-): Promise<string> {
+  options: {
+    apiKey: string;
+    baseURL?: string;
+    model: string;
+    provider: UiLlmProviderId;
+  }
+): Promise<LlmCallResult> {
   const client = new OpenAI({
     apiKey: options.apiKey,
     baseURL: options.baseURL,
@@ -14,7 +21,7 @@ export async function generateWithOpenAICompatible(
   try {
     completion = await client.chat.completions.create({
       model: options.model,
-      temperature: 0.3,
+      temperature: params.temperature ?? 0.3,
       max_tokens: 8192,
       response_format: { type: "json_object" },
       messages: [
@@ -34,5 +41,16 @@ export async function generateWithOpenAICompatible(
     throw new Error("No analysis was returned from the AI service.");
   }
 
-  return content;
+  const usage = completion.usage;
+
+  return {
+    content,
+    model: options.model,
+    provider: options.provider,
+    usage: {
+      inputTokens: usage?.prompt_tokens ?? 0,
+      outputTokens: usage?.completion_tokens ?? 0,
+      totalTokens: usage?.total_tokens ?? 0,
+    },
+  };
 }

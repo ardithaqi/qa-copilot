@@ -18,5 +18,6 @@ export const generateQaAnalysis: GenerateQaAnalysisFn = async (params) => {
     apiKey,
     baseURL: GROQ_BASE_URL,
     model: getModel(),
+    provider: "groq",
   });
 };

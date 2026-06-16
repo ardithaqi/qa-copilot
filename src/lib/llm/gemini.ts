@@ -13,11 +13,12 @@ export const generateQaAnalysis: GenerateQaAnalysisFn = async (params) => {
     throw new Error("GEMINI_API_KEY is not configured on the server.");
   }
 
+  const modelName = getModel();
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({
-    model: getModel(),
+    model: modelName,
     generationConfig: {
-      temperature: 0.3,
+      temperature: params.temperature ?? 0.3,
       maxOutputTokens: 8192,
       responseMimeType: "application/json",
     },
@@ -31,5 +32,18 @@ export const generateQaAnalysis: GenerateQaAnalysisFn = async (params) => {
     throw new Error("No analysis was returned from the AI service.");
   }
 
-  return text;
+  const metadata = result.response.usageMetadata;
+  const inputTokens = metadata?.promptTokenCount ?? 0;
+  const outputTokens = metadata?.candidatesTokenCount ?? 0;
+
+  return {
+    content: text,
+    model: modelName,
+    provider: "gemini",
+    usage: {
+      inputTokens,
+      outputTokens,
+      totalTokens: metadata?.totalTokenCount ?? inputTokens + outputTokens,
+    },
+  };
 };

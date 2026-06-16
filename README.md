@@ -1,8 +1,8 @@
 # QA Copilot
 
-QA Copilot, an AI Test Design Agent that analyzes requirements, bugs, enhancements, and technical changes to generate QA strategies, risk assessments, automation candidates, and Playwright test skeletons.
+QA Copilot is an AI-assisted QA platform. It analyzes requirements, bugs, enhancements, and technical changes to generate QA strategies, risk assessments, automation candidates, and Playwright test skeletons — then **evaluates output quality** with a second LLM pass (coverage %, gaps, strengths, suggestions).
 
-**New chat / AI agent?** Read **[AGENTS.md](./AGENTS.md)** for full project context, architecture, API contract, and what to update when you change the codebase.
+**New chat / AI agent?** Read **[AGENTS.md](./AGENTS.md)** for full project context, roadmap, architecture, API contract, and what to update when you change the codebase.
 
 ## Agent workflow
 
@@ -17,6 +17,8 @@ The LLM follows a multi-step workflow internally:
 7. Playwright Skeleton Generator  
 8. API Test Suggestions  
 9. Final Report Generator  
+
+After generation, a **second LLM call** reviews the output and scores coverage, completeness, and missing areas.
 
 ## Work item types
 
@@ -35,6 +37,7 @@ The LLM follows a multi-step workflow internally:
 8. Playwright Skeletons  
 9. API Test Suggestions  
 10. Final QA Notes  
+11. **AI quality evaluation** (coverage %, gaps, strengths, suggestions)
 
 ## Downloads
 
@@ -45,6 +48,7 @@ From the results UI you can download:
 - `automation-candidates.md` (automation recommendations)  
 - `{test-scenario}.spec.ts` — Playwright skeleton (filename from what the spec verifies)  
 - `api-test-suggestions.md`  
+- `evaluation-report.md` — LLM quality evaluation
 
 ## Setup
 
@@ -61,6 +65,8 @@ Open [http://localhost:3000](http://localhost:3000).
 
 This repo does **not** include API keys. **Bring your own key** for whichever LLM provider you select in the UI (Groq, OpenAI, or Gemini). You only need to set the variable for that provider—the others can stay as placeholders in `.env.local`.
 
+**Note:** **Analyze** = 1 LLM call. **Analyze & evaluate** = 3 LLM calls (1 generate + 2 evaluation passes).
+
 ## Environment variables
 
 | Variable | Provider | Default model |
@@ -72,6 +78,7 @@ This repo does **not** include API keys. **Bring your own key** for whichever LL
 ## Architecture
 
 ```
+src/lib/evaluation/      # LLM judge prompts, serialize analysis, parse scores
 src/lib/prompt/          # Shared agent prompt + per-type strategies
 src/lib/llm/             # Groq, OpenAI, Gemini providers (+ local stub)
 src/lib/parse-analysis.ts

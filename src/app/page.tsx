@@ -2,7 +2,16 @@
 
 import { useState } from "react";
 import AnalysisResults from "@/components/AnalysisResults";
+import { EVALUATION_RUN_COUNT } from "@/lib/evaluation/constants";
+import RunUsageBanner from "@/components/RunUsageBanner";
+import { mergeUsageSummaries } from "@/lib/llm";
 import { UI_LLM_PROVIDERS, type UiLlmProviderId } from "@/lib/llm/types";
+import type { LlmUsageSummary } from "@/lib/llm/usage-types";
+import type {
+  EvaluateErrorResponse,
+  EvaluateSuccessResponse,
+  EvaluationResult,
+} from "@/lib/evaluation/types";
 import type {
   AnalyzeErrorResponse,
   AnalyzeSuccessResponse,
@@ -29,11 +38,19 @@ export default function Home() {
   const [resultProvider, setResultProvider] = useState<UiLlmProviderId | null>(
     null
   );
+  const [evaluation, setEvaluation] = useState<EvaluationResult | null>(null);
+  const [evaluationRequirement, setEvaluationRequirement] = useState<string | null>(
+    null
+  );
+  const [runUsage, setRunUsage] = useState<LlmUsageSummary | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingMode, setLoadingMode] = useState<"generate" | "evaluate" | null>(
+    null
+  );
   const [error, setError] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  async function handleAnalyze() {
+  async function handleAnalyze(withEvaluation: boolean) {
     const trimmed = input.trim();
     setValidationError(null);
     setError(null);
@@ -44,8 +61,12 @@ export default function Home() {
     }
 
     setLoading(true);
+    setLoadingMode("generate");
     setAnalysis(null);
     setResultProvider(null);
+    setEvaluation(null);
+    setEvaluationRequirement(null);
+    setRunUsage(null);
 
     try {
       let response: Response;
@@ -86,12 +107,48 @@ export default function Home() {
 
       setAnalysis(successData.analysis);
       setResultProvider(successData.provider ?? provider);
+      setRunUsage(successData.usage);
+
+      if (!withEvaluation) {
+        return;
+      }
+
+      setLoadingMode("evaluate");
+      const evalResponse = await fetch("/api/evaluate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          analysis: successData.analysis,
+          requirement: trimmed,
+          provider,
+        }),
+      });
+
+      let evalData: EvaluateSuccessResponse | EvaluateErrorResponse;
+      try {
+        evalData = (await evalResponse.json()) as
+          | EvaluateSuccessResponse
+          | EvaluateErrorResponse;
+      } catch {
+        throw new Error("Invalid evaluation response from server.");
+      }
+
+      if (!evalResponse.ok) {
+        const errorData = evalData as EvaluateErrorResponse;
+        throw new Error(errorData.error || "Evaluation failed.");
+      }
+
+      const evalSuccess = evalData as EvaluateSuccessResponse;
+      setEvaluation(evalSuccess.evaluation);
+      setEvaluationRequirement(evalSuccess.requirement);
+      setRunUsage(mergeUsageSummaries(successData.usage, evalSuccess.usage));
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Something went wrong. Please try again."
       );
     } finally {
       setLoading(false);
+      setLoadingMode(null);
     }
   }
 
@@ -102,9 +159,9 @@ export default function Home() {
           QA Copilot
         </h1>
         <p className="mt-2 text-slate-600">
-          An AI Test Design Agent that analyzes requirements, bugs, enhancements,
-          and technical changes to generate QA strategies, risk assessments,
-          automation candidates, and Playwright test skeletons.
+          An AI-assisted QA platform that generates test strategies, risk assessments,
+          automation candidates, and Playwright skeletons — optionally evaluated by a
+          second LLM pass.
         </p>
       </header>
 
@@ -185,19 +242,42 @@ export default function Home() {
           </div>
         )}
 
-        <button
-          type="button"
-          onClick={handleAnalyze}
-          disabled={loading}
-          className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {loading ? "Running test design agent…" : "Analyze"}
-        </button>
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={() => handleAnalyze(false)}
+            disabled={loading}
+            className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading && loadingMode === "generate"
+              ? "Generating report…"
+              : "Analyze"}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleAnalyze(true)}
+            disabled={loading}
+            className="inline-flex items-center justify-center rounded-lg bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading && loadingMode === "evaluate"
+              ? "Evaluating output…"
+              : loading && loadingMode === "generate"
+                ? "Generating report…"
+                : "Analyze & evaluate"}
+          </button>
+        </div>
+        <p className="text-xs text-slate-500">
+          <span className="font-medium text-slate-600">Analyze</span> — 1 LLM call
+          (report only).{" "}
+          <span className="font-medium text-slate-600">Analyze &amp; evaluate</span>{" "}
+          — {1 + EVALUATION_RUN_COUNT} LLM calls (report + quality scores).
+        </p>
 
         {loading && (
           <p className="text-sm text-slate-600">
-            Agent workflow: requirement analysis → rules → risks → test design →
-            automation &amp; API suggestions ({PROVIDER_LABELS[provider]}).
+            {loadingMode === "evaluate"
+              ? `LLM judge: ${EVALUATION_RUN_COUNT} passes + hard checks (${PROVIDER_LABELS[provider]}).`
+              : `Agent workflow: requirement analysis → rules → risks → test design → automation & API suggestions (${PROVIDER_LABELS[provider]}).`}
           </p>
         )}
       </div>
@@ -212,7 +292,12 @@ export default function Home() {
               </span>
             )}
           </div>
-          <AnalysisResults analysis={analysis} />
+          {runUsage ? <RunUsageBanner usage={runUsage} /> : null}
+          <AnalysisResults
+            analysis={analysis}
+            evaluation={evaluation}
+            evaluationRequirement={evaluationRequirement}
+          />
         </div>
       )}
     </main>

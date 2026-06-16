@@ -1,4 +1,5 @@
 import type { UiLlmProviderId } from "@/lib/llm/types";
+import type { LlmUsageSummary } from "@/lib/llm/usage-types";
 import type {
   ConfidenceLevel,
   WorkItemType,
@@ -92,6 +93,7 @@ export interface AnalyzeRequest {
 export interface AnalyzeSuccessResponse {
   analysis: QAAnalysis;
   provider: UiLlmProviderId;
+  usage: LlmUsageSummary;
 }
 
 export interface AnalyzeErrorResponse {

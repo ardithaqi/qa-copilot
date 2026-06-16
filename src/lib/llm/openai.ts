@@ -16,5 +16,6 @@ export const generateQaAnalysis: GenerateQaAnalysisFn = async (params) => {
   return generateWithOpenAICompatible(params, {
     apiKey,
     model: getModel(),
+    provider: "openai",
   });
 };

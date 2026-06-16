@@ -1,5 +1,7 @@
 import ExportDownloads from "@/components/ExportDownloads";
+import EvaluationResults from "@/components/EvaluationResults";
 import { buildPlaywrightSpec } from "@/lib/export-reports";
+import type { EvaluationResult } from "@/lib/evaluation/types";
 import type { AutomationCandidate, QAAnalysis, QATestCase } from "@/types/qa-analysis";
 import { formatTestCaseCategory } from "@/types/qa-analysis";
 import {
@@ -9,6 +11,8 @@ import {
 
 interface AnalysisResultsProps {
   analysis: QAAnalysis;
+  evaluation?: EvaluationResult | null;
+  evaluationRequirement?: string | null;
 }
 
 function Section({
@@ -172,7 +176,11 @@ function WorkItemTypeSection({ analysis }: { analysis: QAAnalysis }) {
   );
 }
 
-export default function AnalysisResults({ analysis }: AnalysisResultsProps) {
+export default function AnalysisResults({
+  analysis,
+  evaluation,
+  evaluationRequirement,
+}: AnalysisResultsProps) {
   const hasRisks =
     analysis.risks.product.length > 0 ||
     analysis.risks.technical.length > 0 ||
@@ -182,6 +190,13 @@ export default function AnalysisResults({ analysis }: AnalysisResultsProps) {
   return (
     <div className="space-y-5">
       <ExportDownloads analysis={analysis} />
+
+      {evaluation && evaluationRequirement ? (
+        <EvaluationResults
+          evaluation={evaluation}
+          requirement={evaluationRequirement}
+        />
+      ) : null}
 
       <Section title="1. Work Item Type" variant="info">
         <WorkItemTypeSection analysis={analysis} />
