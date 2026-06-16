@@ -3,7 +3,7 @@
 > **For AI agents and new chat sessions:** Read this file first. It describes the real codebase as of the last update below.  
 > **For humans:** Paste into a new Cursor chat: *“Read `AGENTS.md` in this workspace and continue from there.”*
 
-**Last updated:** 2026-06-03  
+**Last updated:** 2026-06-16  
 **Repo:** [github.com/ardithaqi/qa-copilot](https://github.com/ardithaqi/qa-copilot) (public)  
 **Workspace path:** local clone path may differ (e.g. `qa-copilot` on disk)  
 **Do not use:** old copies under `Desktop/oleaburger/` or other stale clones — this tree is the canonical standalone repo
@@ -111,7 +111,7 @@ Coverage score + feedback
 
 ### Generation
 
-- **10 report sections** (no Assumptions section; gaps go in Missing or Unclear Information).
+- **10 report sections** in JSON; **6 shown in UI** (risks, grouped test cases, automation, Playwright, API when relevant, final notes). Work item type, summary, business rules, and missing-info are internal only.
 - **Test Cases** — scenarios with plain metadata line: `#01 · Type · Priority` (no colored badges).
 - **Automation Recommendations** — priority `High|Medium|Low` (P0/P1/P2 normalized in parser); layer UI|API|E2E; why automate / keep manual.
 - **Playwright** — prompt + `resolvePlaywrightSkeleton()` in `src/lib/playwright-skeleton.ts`: aligns tests to automation candidates; replaces generic `TODO: feature name` placeholders; every **High** priority automatable candidate gets a test.
@@ -239,7 +239,7 @@ Defined in `src/lib/prompt/strategies.ts` and injected via `buildUserPrompt()`:
 ### Quality rules (must preserve)
 
 - Analyze **only** provided text; do not invent routes, selectors, test data, API endpoints, or credentials.
-- List gaps and open questions in `missingOrUnclearInformation[]` — no separate assumptions section.
+- List gaps used internally in `missingOrUnclearInformation[]`; surface follow-ups in `finalQaNotes` for the user-facing report.
 - **Playwright:** generated from **Automation Recommendations** (one test per candidate when possible); every **High** priority candidate must appear; `// TODO:` for routes, selectors, auth; no invented URLs/selectors/credentials.
 - **API suggestions:** only when input implies backend; use TODO placeholders for unknown endpoints.
 
@@ -255,16 +255,15 @@ Defined in `src/lib/prompt/strategies.ts` and injected via `buildUserPrompt()`:
 
 ### Output sections (UI order)
 
-1. Work Item Type (selected, effective, detected, confidence, reasoning)  
-2. Feature / Bug / Change Summary  
-3. Business Rules (explicit + implied)  
-4. Missing or Unclear Information  
-5. Risks (product, technical, regression, security/data)  
-6. Test Cases — `manualTestCases[]` in JSON; UI label **Test Cases**; metadata: `#nn · Type · Priority` (labels in `TEST_CASE_CATEGORY_LABELS`); no automation badge on cards  
-7. Automation Recommendations — `automationCandidates[]`; priority High|Medium|Low; layer; why automate / why not yet / keep manual  
-8. Playwright Skeletons — resolved skeleton (not raw LLM placeholder)  
-9. API Test Suggestions  
-10. Final QA Notes  
+User-facing report only — internal JSON fields (`workItem`, `summary`, `businessRules`, `missingOrUnclearInformation`) still generated for parsing and strategy but **not shown** in UI or `qa-report.md`.
+
+1. **Work item type** — selected, effective, detected (auto), confidence, reasoning  
+2. **Risks** — product, technical, regression, security/data  
+3. **Test cases** — grouped headers: Happy paths TC, Negative TC, Edge TC, etc.  
+3. **Automation recommendations** — priority High|Medium|Low; layer; why automate / keep manual  
+4. **Playwright skeleton** — resolved skeleton (not raw LLM placeholder)  
+5. **API test suggestions** — only when backend/API behavior is implied (hidden when N/A)  
+6. **Final QA notes** — brief wrap-up and open questions  
 
 ### Downloads (client-side)
 
@@ -492,6 +491,7 @@ Use this section for future work; remove items when done and note in Changelog.
 
 | Date | Change |
 | ---- | ------ |
+| 2026-06-03 | **Streamlined report UI:** risks, grouped test cases, automation, Playwright, API (when relevant), final notes; hide work item type, summary, business rules, missing-info. |
 | 2026-06-03 | **Optional media:** screenshots (OpenAI/Gemini) or video (Gemini); `MediaAttachmentsInput`, `src/lib/attachments/`, multimodal LLM wiring. |
 | 2026-06-03 | **Usage UI:** collapsible Usage details after runs; server `logUsageSummary` for operators. |
 | 2026-06-03 | **Hardened evaluation:** temp 0.1, fixed rubric, multi-run median/average, hard checks + penalty. |
@@ -507,3 +507,6 @@ Use this section for future work; remove items when done and note in Changelog.
 | 2026-06-02 | Renamed project from QA Copilot to **QA Architect** (UI, docs, `package.json` name). |
 | 2026-06-01 | Created AGENTS.md. Documented Test Design Agent, multi-provider, work item types, 11 output sections, exports, architecture. |
 | 2026-06-01 | Prior session: MVP from oleaburger → standalone; Groq/Gemini/OpenAI providers; improved prompts; agent workflow. |
+| 2026-06-16 | **Evaluation:** split accuracy vs coverage in AI quality evaluation output. |
+| 2026-06-16 | **Generator prompt:** require more edge-case coverage for async/event-driven inputs in Analyze output. |
+| 2026-06-16 | **Generator prompt:** strengthen async/event-driven checklist items so Analyze includes DB side effects, consumer vs broker outage, and explicit retry/schema edge cases. |

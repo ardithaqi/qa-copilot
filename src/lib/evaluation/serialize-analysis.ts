@@ -1,27 +1,9 @@
+import { groupTestCasesByCategory, hasApiTestSuggestions } from "@/lib/report-display";
 import type { QAAnalysis } from "@/types/qa-analysis";
 import { formatTestCaseCategory } from "@/types/qa-analysis";
 
 export function serializeAnalysisForEvaluation(analysis: QAAnalysis): string {
   const sections: string[] = [];
-
-  sections.push("## Summary", analysis.summary || "—", "");
-
-  sections.push("## Business rules");
-  if (analysis.businessRules.explicit.length > 0) {
-    sections.push("Explicit:", ...analysis.businessRules.explicit.map((r) => `- ${r}`));
-  }
-  if (analysis.businessRules.implied.length > 0) {
-    sections.push("Implied:", ...analysis.businessRules.implied.map((r) => `- ${r}`));
-  }
-  sections.push("");
-
-  sections.push("## Missing or unclear information");
-  sections.push(
-    ...(analysis.missingOrUnclearInformation.length > 0
-      ? analysis.missingOrUnclearInformation.map((item) => `- ${item}`)
-      : ["- None listed"])
-  );
-  sections.push("");
 
   sections.push("## Risks");
   const riskGroups = [
@@ -38,16 +20,22 @@ export function serializeAnalysisForEvaluation(analysis: QAAnalysis): string {
   sections.push("");
 
   sections.push("## Test cases");
-  if (analysis.manualTestCases.length === 0) {
+  const groups = groupTestCasesByCategory(analysis.manualTestCases);
+  if (groups.length === 0) {
     sections.push("- None generated");
   } else {
-    for (const [index, testCase] of analysis.manualTestCases.entries()) {
-      sections.push(
-        `${index + 1}. ${testCase.title}`,
-        `   Type: ${formatTestCaseCategory(testCase.category)} · Priority: ${testCase.priority}`,
-        `   Steps: ${testCase.steps.join(" → ") || "—"}`,
-        `   Expected: ${testCase.expectedResult || "—"}`
-      );
+    let index = 0;
+    for (const group of groups) {
+      sections.push(`### ${group.label}`);
+      for (const testCase of group.cases) {
+        index += 1;
+        sections.push(
+          `${index}. ${testCase.title}`,
+          `   Type: ${formatTestCaseCategory(testCase.category)} · Priority: ${testCase.priority}`,
+          `   Steps: ${testCase.steps.join(" → ") || "—"}`,
+          `   Expected: ${testCase.expectedResult || "—"}`
+        );
+      }
     }
   }
   sections.push("");
@@ -64,15 +52,15 @@ export function serializeAnalysisForEvaluation(analysis: QAAnalysis): string {
   }
   sections.push("");
 
-  sections.push("## API test suggestions");
-  sections.push(
-    ...(analysis.apiTestSuggestions.length > 0
-      ? analysis.apiTestSuggestions.map((item) => `- ${item}`)
-      : ["- None generated"])
-  );
-  sections.push("");
+  if (hasApiTestSuggestions(analysis.apiTestSuggestions)) {
+    sections.push("## API test suggestions");
+    sections.push(...analysis.apiTestSuggestions.map((item) => `- ${item}`));
+    sections.push("");
+  }
 
-  sections.push("## Final QA notes", analysis.finalQaNotes || "—");
+  if (analysis.finalQaNotes?.trim()) {
+    sections.push("## Final QA notes", analysis.finalQaNotes);
+  }
 
   return sections.join("\n");
 }

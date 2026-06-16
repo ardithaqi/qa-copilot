@@ -1,6 +1,6 @@
 # QA Copilot
 
-QA Copilot is an AI-assisted QA platform. It analyzes requirements, bugs, enhancements, and technical changes to generate QA strategies, risk assessments, automation candidates, and Playwright test skeletons — optionally with **screenshots or screen recordings** — then **evaluates output quality** with a second LLM pass (coverage %, gaps, strengths, suggestions).
+QA Copilot is an AI-assisted QA platform. It analyzes requirements, bugs, enhancements, and technical changes to generate QA strategies, risk assessments, automation candidates, and Playwright test skeletons — optionally with **screenshots or screen recordings** — then **evaluates output quality** with a second LLM pass (coverage %, accuracy issues, gaps, strengths, suggestions).
 
 **New chat / AI agent?** Read **[AGENTS.md](./AGENTS.md)** for full project context, roadmap, architecture, API contract, and what to update when you change the codebase.
 
@@ -27,17 +27,17 @@ After generation, a **second LLM call** reviews the output and scores coverage, 
 
 ## Output sections
 
-1. Work Item Type  
-2. Feature / Bug / Change Summary  
-3. Business Rules  
-4. Missing or Unclear Information  
-5. Risks  
-6. Test Cases  
-7. Automation Recommendations  
-8. Playwright Skeletons  
-9. API Test Suggestions  
-10. Final QA Notes  
-11. **AI quality evaluation** (coverage %, gaps, strengths, suggestions)
+Shown in the report:
+
+1. Work item type  
+2. Risks  
+3. Test cases (Happy path TC, Negative TC, Edge TC, …)  
+3. Automation recommendations  
+4. Playwright skeleton  
+5. API test suggestions (when relevant)  
+6. Final QA notes  
+
+Plus **AI quality evaluation** when using Analyze & evaluate (coverage + accuracy issues, gap lists, strengths, suggestions).
 
 ## Downloads
 

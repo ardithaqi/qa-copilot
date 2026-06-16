@@ -1,6 +1,7 @@
 import ExportDownloads from "@/components/ExportDownloads";
 import EvaluationResults from "@/components/EvaluationResults";
 import { buildPlaywrightSpec } from "@/lib/export-reports";
+import { groupTestCasesByCategory, hasApiTestSuggestions } from "@/lib/report-display";
 import type { EvaluationResult } from "@/lib/evaluation/types";
 import type { AutomationCandidate, QAAnalysis, QATestCase } from "@/types/qa-analysis";
 import { formatTestCaseCategory } from "@/types/qa-analysis";
@@ -111,33 +112,6 @@ function TestCaseCard({ testCase, index }: { testCase: QATestCase; index: number
   );
 }
 
-function AutomationCard({ candidate }: { candidate: AutomationCandidate }) {
-  return (
-    <article className="rounded-md border border-slate-200 bg-slate-50/80 p-4 text-sm">
-      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-        <TestCaseMeta label="Priority" value={candidate.priority} />
-        <TestCaseMeta label="Layer" value={candidate.layer} />
-        {candidate.manualOnly ? (
-          <TestCaseMeta label="Run" value="Keep manual" />
-        ) : null}
-      </div>
-      <h3 className="mt-2 font-semibold text-slate-900">{candidate.scenario}</h3>
-      {candidate.whyAutomate ? (
-        <p className="mt-2">
-          <span className="font-medium text-slate-700">Why automate: </span>
-          {candidate.whyAutomate}
-        </p>
-      ) : null}
-      {candidate.whyNotAutomate ? (
-        <p className="mt-1">
-          <span className="font-medium text-slate-700">Why not yet: </span>
-          {candidate.whyNotAutomate}
-        </p>
-      ) : null}
-    </article>
-  );
-}
-
 function WorkItemTypeSection({ analysis }: { analysis: QAAnalysis }) {
   const { workItem } = analysis;
   return (
@@ -176,6 +150,33 @@ function WorkItemTypeSection({ analysis }: { analysis: QAAnalysis }) {
   );
 }
 
+function AutomationCard({ candidate }: { candidate: AutomationCandidate }) {
+  return (
+    <article className="rounded-md border border-slate-200 bg-slate-50/80 p-4 text-sm">
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+        <TestCaseMeta label="Priority" value={candidate.priority} />
+        <TestCaseMeta label="Layer" value={candidate.layer} />
+        {candidate.manualOnly ? (
+          <TestCaseMeta label="Run" value="Keep manual" />
+        ) : null}
+      </div>
+      <h3 className="mt-2 font-semibold text-slate-900">{candidate.scenario}</h3>
+      {candidate.whyAutomate ? (
+        <p className="mt-2">
+          <span className="font-medium text-slate-700">Why automate: </span>
+          {candidate.whyAutomate}
+        </p>
+      ) : null}
+      {candidate.whyNotAutomate ? (
+        <p className="mt-1">
+          <span className="font-medium text-slate-700">Why not yet: </span>
+          {candidate.whyNotAutomate}
+        </p>
+      ) : null}
+    </article>
+  );
+}
+
 export default function AnalysisResults({
   analysis,
   evaluation,
@@ -186,6 +187,11 @@ export default function AnalysisResults({
     analysis.risks.technical.length > 0 ||
     analysis.risks.regression.length > 0 ||
     analysis.risks.securityOrData.length > 0;
+
+  const testCaseGroups = groupTestCasesByCategory(analysis.manualTestCases);
+  let testCaseIndex = 0;
+  const showApiSuggestions = hasApiTestSuggestions(analysis.apiTestSuggestions);
+  const showFinalNotes = Boolean(analysis.finalQaNotes?.trim());
 
   return (
     <div className="space-y-5">
@@ -198,28 +204,11 @@ export default function AnalysisResults({
         />
       ) : null}
 
-      <Section title="1. Work Item Type" variant="info">
+      <Section title="Work item type" variant="info">
         <WorkItemTypeSection analysis={analysis} />
       </Section>
 
-      <Section title="2. Feature / Bug / Change Summary">
-        <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
-          {analysis.summary || "No summary provided."}
-        </p>
-      </Section>
-
-      <Section title="3. Business Rules">
-        <p className="mb-2 text-xs font-semibold uppercase text-slate-500">Explicit</p>
-        <BulletList items={analysis.businessRules.explicit} />
-        <p className="mb-2 mt-4 text-xs font-semibold uppercase text-slate-500">Implied</p>
-        <BulletList items={analysis.businessRules.implied} />
-      </Section>
-
-      <Section title="4. Missing or Unclear Information" variant="warning">
-        <BulletList items={analysis.missingOrUnclearInformation} />
-      </Section>
-
-      <Section title="5. Risks">
+      <Section title="Risks">
         {hasRisks ? (
           <div className="space-y-4 text-sm">
             {analysis.risks.product.length > 0 ? (
@@ -252,16 +241,31 @@ export default function AnalysisResults({
         )}
       </Section>
 
-      <Section title="6. Test Cases">
-        <p className="mb-3 text-xs text-slate-500">
-          Scenarios to verify the work item — each tagged with type (happy path,
-          negative, edge, etc.) and priority. Automation decisions are in the next
-          section.
+      <Section title="Test cases">
+        <p className="mb-4 text-xs text-slate-500">
+          Grouped by scenario type. Automation decisions are in the next section.
         </p>
-        {analysis.manualTestCases.length > 0 ? (
-          <div className="space-y-4">
-            {analysis.manualTestCases.map((tc, index) => (
-              <TestCaseCard key={`${index}-${tc.title}`} testCase={tc} index={index} />
+        {testCaseGroups.length > 0 ? (
+          <div className="space-y-6">
+            {testCaseGroups.map((group) => (
+              <div key={group.category}>
+                <h3 className="mb-3 text-sm font-semibold text-slate-800">
+                  {group.label}
+                </h3>
+                <div className="space-y-4">
+                  {group.cases.map((testCase) => {
+                    const index = testCaseIndex;
+                    testCaseIndex += 1;
+                    return (
+                      <TestCaseCard
+                        key={`${group.category}-${testCase.title}`}
+                        testCase={testCase}
+                        index={index}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
             ))}
           </div>
         ) : (
@@ -269,7 +273,7 @@ export default function AnalysisResults({
         )}
       </Section>
 
-      <Section title="7. Automation Recommendations">
+      <Section title="Automation recommendations">
         <p className="mb-3 text-xs text-slate-500">
           Which scenarios to automate (and at what layer), what to keep manual for
           now, and why.
@@ -285,7 +289,7 @@ export default function AnalysisResults({
         )}
       </Section>
 
-      <Section title="8. Playwright Skeletons">
+      <Section title="Playwright skeleton">
         <p className="mb-3 text-xs text-slate-500">
           Skeleton only — confirm routes, selectors, and auth with your team.
         </p>
@@ -294,15 +298,19 @@ export default function AnalysisResults({
         </pre>
       </Section>
 
-      <Section title="9. API Test Suggestions">
-        <BulletList items={analysis.apiTestSuggestions} />
-      </Section>
+      {showApiSuggestions ? (
+        <Section title="API test suggestions">
+          <BulletList items={analysis.apiTestSuggestions} />
+        </Section>
+      ) : null}
 
-      <Section title="10. Final QA Notes">
-        <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
-          {analysis.finalQaNotes || "No final notes provided."}
-        </p>
-      </Section>
+      {showFinalNotes ? (
+        <Section title="Final QA notes">
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
+            {analysis.finalQaNotes}
+          </p>
+        </Section>
+      ) : null}
     </div>
   );
 }

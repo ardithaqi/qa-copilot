@@ -41,12 +41,15 @@ export function parseEvaluationResponse(raw: string): LlmEvaluationRun {
 
   return {
     coveragePercent: clampScore(data.coveragePercent),
+    accuracyScore:
+      data.accuracyScore === undefined ? 100 : clampScore(data.accuracyScore),
     qualityScore: clampScore(data.qualityScore),
     summary: firstString(data.summary, "No summary provided."),
     missingScenarios: stringArray(data.missingScenarios),
     missingEdgeCases: stringArray(data.missingEdgeCases),
     missingApiValidations: stringArray(data.missingApiValidations),
     missingRisks: stringArray(data.missingRisks),
+    accuracyIssues: stringArray(data.accuracyIssues),
     strengths: stringArray(data.strengths),
     improvementSuggestions: stringArray(data.improvementSuggestions),
   };

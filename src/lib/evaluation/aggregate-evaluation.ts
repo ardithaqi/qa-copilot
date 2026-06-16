@@ -108,9 +108,11 @@ export function aggregateEvaluationRuns(
   analysis: QAAnalysis
 ): EvaluationResult {
   const coverages = runs.map((run) => run.coveragePercent);
+  const accuracies = runs.map((run) => run.accuracyScore);
   const qualities = runs.map((run) => run.qualityScore);
   const coverageMedian = median(coverages);
   const qualityMedian = median(qualities);
+  const accuracyMedian = median(accuracies);
   const hardChecks = runHardChecks(requirement, analysis);
   const { qualityScore, hardCheckPenalty } = applyHardCheckPenalty(
     qualityMedian,
@@ -127,9 +129,13 @@ export function aggregateEvaluationRuns(
     runs.map((run) => run.missingApiValidations)
   );
   const consistentMissingRisks = itemsInMultipleRuns(runs.map((run) => run.missingRisks));
+  const consistentAccuracyIssues = itemsInMultipleRuns(
+    runs.map((run) => run.accuracyIssues)
+  );
 
   return {
     coveragePercent: coverageMedian,
+    accuracyScore: accuracyMedian,
     qualityScore,
     llmQualityMedian: qualityMedian,
     summary: pickRepresentativeSummary(runs, qualityMedian),
@@ -149,6 +155,10 @@ export function aggregateEvaluationRuns(
       consistentMissingRisks.length > 0
         ? consistentMissingRisks
         : unionUniqueStrings(runs.map((run) => run.missingRisks)),
+    accuracyIssues:
+      consistentAccuracyIssues.length > 0
+        ? consistentAccuracyIssues
+        : unionUniqueStrings(runs.map((run) => run.accuracyIssues)),
     strengths: unionUniqueStrings(runs.map((run) => run.strengths)),
     improvementSuggestions: unionUniqueStrings(
       runs.map((run) => run.improvementSuggestions)
@@ -159,6 +169,10 @@ export function aggregateEvaluationRuns(
       coverageAverage: average(coverages),
       coverageMin: Math.min(...coverages),
       coverageMax: Math.max(...coverages),
+      accuracyMedian,
+      accuracyAverage: average(accuracies),
+      accuracyMin: Math.min(...accuracies),
+      accuracyMax: Math.max(...accuracies),
       qualityMedian,
       qualityAverage: average(qualities),
       qualityMin: Math.min(...qualities),

@@ -1,4 +1,8 @@
 import { resolvePlaywrightSkeleton } from "@/lib/playwright-skeleton";
+import {
+  groupTestCasesByCategory,
+  hasApiTestSuggestions,
+} from "@/lib/report-display";
 import type { EvaluationResult } from "@/lib/evaluation/types";
 import type { QAAnalysis, QATestCase } from "@/types/qa-analysis";
 import { formatTestCaseCategory } from "@/types/qa-analysis";
@@ -42,29 +46,29 @@ function workItemSection(analysis: QAAnalysis): string {
   return lines.join("\n");
 }
 
+function formatTestCasesBody(analysis: QAAnalysis): string[] {
+  const groups = groupTestCasesByCategory(analysis.manualTestCases);
+  if (groups.length === 0) {
+    return ["_No test cases generated._"];
+  }
+
+  const lines: string[] = [];
+  let index = 0;
+  for (const group of groups) {
+    lines.push(`### ${group.label}`, "");
+    for (const testCase of group.cases) {
+      lines.push(formatTestCase(testCase, index));
+      index += 1;
+    }
+  }
+  return lines;
+}
+
 export function buildQaReportMarkdown(analysis: QAAnalysis): string {
   const sections = [
     `# QA Test Design Report`,
     ``,
     workItemSection(analysis),
-    ``,
-    `## Summary`,
-    analysis.summary || "—",
-    ``,
-    `## Business rules`,
-    `### Explicit`,
-    ...(analysis.businessRules.explicit.length
-      ? analysis.businessRules.explicit.map((r) => `- ${r}`)
-      : ["- None listed"]),
-    `### Implied`,
-    ...(analysis.businessRules.implied.length
-      ? analysis.businessRules.implied.map((r) => `- ${r}`)
-      : ["- None listed"]),
-    ``,
-    `## Missing or unclear information`,
-    ...(analysis.missingOrUnclearInformation.length
-      ? analysis.missingOrUnclearInformation.map((m) => `- ${m}`)
-      : ["- None"]),
     ``,
     `## Risks`,
     `### Product`,
@@ -77,22 +81,31 @@ export function buildQaReportMarkdown(analysis: QAAnalysis): string {
     ...analysis.risks.securityOrData.map((r) => `- ${r}`),
     ``,
     `## Test cases`,
-    ...analysis.manualTestCases.map((tc, i) => formatTestCase(tc, i)),
-    `## Automation candidates`,
+    ...formatTestCasesBody(analysis),
+    `## Automation recommendations`,
     ...analysis.automationCandidates.map(
       (c) =>
         `- **${c.scenario}** (${c.priority}, ${c.layer}) — Automate: ${c.whyAutomate || "—"}${c.whyNotAutomate ? ` | Not now: ${c.whyNotAutomate}` : ""}${c.manualOnly ? " [manual-only]" : ""}`
     ),
     ``,
-    `## API test suggestions`,
-    ...analysis.apiTestSuggestions.map((s) => `- ${s}`),
-    ``,
-    `## Final QA notes`,
-    analysis.finalQaNotes || "—",
-    ``,
-    `## Playwright skeletons`,
-    `See \`${getPlaywrightExportFilename(analysis)}\` export.`,
   ];
+
+  if (hasApiTestSuggestions(analysis.apiTestSuggestions)) {
+    sections.push(
+      `## API test suggestions`,
+      ...analysis.apiTestSuggestions.map((s) => `- ${s}`),
+      ``
+    );
+  }
+
+  if (analysis.finalQaNotes?.trim()) {
+    sections.push(`## Final QA notes`, analysis.finalQaNotes, ``);
+  }
+
+  sections.push(
+    `## Playwright skeleton`,
+    `See \`${getPlaywrightExportFilename(analysis)}\` export.`
+  );
 
   return sections.join("\n");
 }
@@ -100,7 +113,7 @@ export function buildQaReportMarkdown(analysis: QAAnalysis): string {
 export function buildTestCasesMarkdown(analysis: QAAnalysis): string {
   const header = `# Test cases\n\n${workItemSection(analysis)}\n\n`;
   const body = analysis.manualTestCases.length
-    ? analysis.manualTestCases.map((tc, i) => formatTestCase(tc, i)).join("\n")
+    ? formatTestCasesBody(analysis).join("\n")
     : "_No test cases generated._\n";
   return header + body;
 }
@@ -110,8 +123,6 @@ export function buildAutomationCandidatesMarkdown(
 ): string {
   const lines = [
     `# Automation recommendations`,
-    ``,
-    workItemSection(analysis),
     ``,
   ];
 
@@ -136,10 +147,12 @@ export function buildAutomationCandidatesMarkdown(
 }
 
 export function buildApiTestSuggestionsMarkdown(analysis: QAAnalysis): string {
+  if (!hasApiTestSuggestions(analysis.apiTestSuggestions)) {
+    return "# API test suggestions\n\n_No API/backend behavior described._\n";
+  }
+
   return [
     `# API test suggestions`,
-    ``,
-    workItemSection(analysis),
     ``,
     ...analysis.apiTestSuggestions.map((s) => `- ${s}`),
     ``,
@@ -232,6 +245,7 @@ export function buildEvaluationMarkdown(
     requirement,
     "",
     `- **Coverage (median):** ${evaluation.coveragePercent}%`,
+    `- **Accuracy (median):** ${evaluation.accuracyScore}%`,
     `- **Coverage (average):** ${evaluation.scores.coverageAverage}%`,
     `- **Coverage range:** ${evaluation.scores.coverageMin}–${evaluation.scores.coverageMax}`,
     `- **Quality (final):** ${evaluation.qualityScore}`,
@@ -263,6 +277,7 @@ export function buildEvaluationMarkdown(
     ...listSection("Missing edge cases", evaluation.missingEdgeCases),
     ...listSection("Missing API validations", evaluation.missingApiValidations),
     ...listSection("Missing risks", evaluation.missingRisks),
+    ...listSection("Accuracy issues", evaluation.accuracyIssues),
     ...listSection("Strengths", evaluation.strengths),
     ...listSection("Improvement suggestions", evaluation.improvementSuggestions)
   );

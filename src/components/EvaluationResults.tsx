@@ -104,6 +104,7 @@ export default function EvaluationResults({
         </div>
         <div className="flex flex-wrap gap-2">
           <div
+            title="How complete is the report? Higher means fewer missing test scenarios, edge cases, API checks, or risks."
             className={`rounded-lg border px-4 py-2 text-center ${scoreTone(evaluation.coveragePercent)}`}
           >
             <p className="text-xs font-semibold uppercase tracking-wide">Coverage</p>
@@ -113,6 +114,20 @@ export default function EvaluationResults({
             </p>
           </div>
           <div
+            title="Does the report stick to the ticket? Higher means fewer invented details or claims that aren’t supported by the requirement."
+            className={`rounded-lg border px-4 py-2 text-center ${scoreTone(evaluation.accuracyScore)}`}
+          >
+            <p className="text-xs font-semibold uppercase tracking-wide">Accuracy</p>
+            <p className="text-2xl font-bold tabular-nums">
+              {evaluation.accuracyScore}
+            </p>
+            <p className="text-xs tabular-nums">
+              avg {evaluation.scores.accuracyAverage}% · {evaluation.scores.accuracyMin}–
+              {evaluation.scores.accuracyMax}
+            </p>
+          </div>
+          <div
+            title="Overall grade for the report. Combines coverage, accuracy, and strengths. May be lowered when required checklist items are missing."
             className={`rounded-lg border px-4 py-2 text-center ${scoreTone(evaluation.qualityScore)}`}
           >
             <p className="text-xs font-semibold uppercase tracking-wide">Quality</p>
@@ -153,6 +168,7 @@ export default function EvaluationResults({
         <GapList title="Missing edge cases" items={evaluation.missingEdgeCases} />
         <GapList title="Missing API validations" items={evaluation.missingApiValidations} />
         <GapList title="Missing risks" items={evaluation.missingRisks} />
+        <GapList title="Accuracy issues" items={evaluation.accuracyIssues} />
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">

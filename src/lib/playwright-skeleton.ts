@@ -153,15 +153,30 @@ function candidateCoveredInSkeleton(
   const title = scenarioToTestTitle(scenario).toLowerCase();
   if (skeletonLower.includes(title)) return true;
 
+  const normalizeWord = (word: string): string => {
+    const w = word.toLowerCase().replace(/[^a-z0-9]/g, "");
+    // Very light stemming to avoid obvious mismatches:
+    // asynchronous vs asynchronously, synchronize vs synchronization, devices vs device.
+    return w
+      .replace(/(ization|isation|ation|tion|sion)$/, "")
+      .replace(/(ingly|edly|ingly|edly|ingly|edly)$/, "")
+      .replace(/(ingly|edly|ingly|edly|ly|ing|ed)$/, "")
+      .replace(/s$/, "");
+  };
+
   const words = scenario
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, " ")
     .split(/\s+/)
+    .map((w) => normalizeWord(w))
     .filter((w) => w.length > 3);
 
   if (words.length === 0) return false;
-  const hits = words.filter((w) => skeletonLower.includes(w)).length;
-  return hits >= Math.min(3, words.length);
+  const unique = Array.from(new Set(words));
+  const hits = unique.filter((w) => skeletonLower.includes(w)).length;
+  // Two strong keyword hits is usually enough to avoid duplicate tests,
+  // especially when scenario wording differs slightly from LLM titles.
+  return hits >= Math.min(2, unique.length);
 }
 
 function appendTestsToSkeleton(

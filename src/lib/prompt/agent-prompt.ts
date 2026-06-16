@@ -26,7 +26,7 @@ const JSON_SCHEMA = `
     "confidence": "High|Medium|Low|null",
     "reasoning": "string"
   },
-  "summary": "string — Feature / Bug / Change summary",
+  "summary": "string — internal one-line title; keep brief",
   "businessRules": { "explicit": ["..."], "implied": ["..."] },
   "missingOrUnclearInformation": ["..."],
   "risks": {
@@ -58,11 +58,22 @@ const JSON_SCHEMA = `
   ],
   "playwrightTestSkeletons": "string — TypeScript @playwright/test; one or more tests per automation candidate",
   "apiTestSuggestions": ["string — use TODO for unknown endpoints/payloads"],
-  "finalQaNotes": "string — concise final QA report narrative"
+  "finalQaNotes": "string — brief actionable wrap-up for QA engineers; include open questions or follow-ups here"
 }
 
 Rules:
-- manualTestCases: QA test scenarios (not "manual-only"); at least 3 for non-trivial input; set category and priority (P0|P1|P2). automationSuitability is optional internal hint only — automation decisions belong in automationCandidates.
+- manualTestCases: QA test scenarios grouped by category (happy_path, negative, edge, regression, reproduction).
+  - For non-trivial input include at least one happy path, one negative, and one edge case when applicable. Set priority (P0|P1|P2).
+  - If the input implies async/event-driven or messaging (e.g. RabbitMQ, event bus, queue, subscription, webhook, async processing), generate a *minimum* of 6 test cases that cover:
+    1) happy path for publish/success,
+    2) happy path for consume/success AND the expected side effect (e.g. "creates a record in the target database") when the input implies persistence,
+    3) idempotency/duplicate handling (duplicate delivery + idempotency),
+    4) processing failure with explicit retry/DLQ/poison messaging expectations when implied (otherwise keep TODO in steps, but the title/expectedResult must mention retry and/or DLQ/poison),
+    5) temporary outage for the *consumer* being unavailable (not just broker/event bus outage),
+    6) invalid/malformed payload OR missing required fields (explicit schema/required-field validation when implied),
+    7) if the input mentions a broker/queue/event-bus technology (e.g. RabbitMQ/event bus), include a separate test for the *event bus* being temporarily unavailable during registration/processing.
+  - If the input mentions ordering/out-of-order or concurrency/burst, include at least one edge/reproduction scenario for that too.
+  - automationSuitability is optional internal hint only — automation decisions belong in automationCandidates.
 - automationCandidates: recommendations for what to automate; priority High|Medium|Low; layer (UI|API|E2E); why or why not yet. List every meaningful UI/E2E scenario from the ticket (e.g. export button visibility, export flow, permissions, empty state).
 - playwrightTestSkeletons: MUST follow Playwright skeleton rules below.
 `;
@@ -116,10 +127,11 @@ ${AGENT_STAGES}
 ## Global rules
 1. Ground every statement in the user input. Use the ticket's vocabulary.
 2. When screenshots or video are attached, use visible UI states, labels, and flows from the media together with the text. Do not invent details not shown.
-3. Do not output an assumptions section or ASSUMPTION-prefixed items. Put unknowns and open questions only in missingOrUnclearInformation[].
-4. List unknowns in missingOrUnclearInformation[] — do not guess.
-5. Complete automationCandidates before playwrightTestSkeletons — Playwright output must reflect those candidates.
-6. Do not use page.locator('text=...') unless that exact visible text is in the input.
+3. The user-facing report shows risks, test cases, automation recommendations, Playwright skeleton, API suggestions (when relevant), and final QA notes only. Keep summary, businessRules, and missingOrUnclearInformation as internal scaffolding — brief and used to inform test design; do not repeat them in finalQaNotes.
+4. Put open questions and follow-ups in finalQaNotes[] — not as a separate visible section.
+5. Do not output an assumptions section or ASSUMPTION-prefixed items.
+6. Complete automationCandidates before playwrightTestSkeletons — Playwright output must reflect those candidates.
+7. Do not use page.locator('text=...') unless that exact visible text is in the input.
 
 ${JSON_SCHEMA}
 ${PLAYWRIGHT_SKELETON_RULES}
