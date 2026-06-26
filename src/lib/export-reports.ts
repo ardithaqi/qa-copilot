@@ -12,7 +12,7 @@ import {
   WORK_ITEM_TYPE_LABELS,
 } from "@/types/work-item";
 
-function formatTestCase(tc: QATestCase, index: number): string {
+export function formatTestCaseAsMarkdown(tc: QATestCase, index: number): string {
   const lines = [
     `### ${index + 1}. ${tc.title}`,
     `- **Type:** ${formatTestCaseCategory(tc.category)}`,
@@ -58,7 +58,7 @@ function formatTestCasesBody(analysis: QAAnalysis): string[] {
   for (const group of groups) {
     lines.push(`### ${group.label}`, "");
     for (const testCase of group.cases) {
-      lines.push(formatTestCase(testCase, index));
+      lines.push(formatTestCaseAsMarkdown(testCase, index));
       index += 1;
     }
   }

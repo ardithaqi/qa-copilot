@@ -5,6 +5,7 @@ import AnalysisResults from "@/components/AnalysisResults";
 import MediaAttachmentsInput from "@/components/MediaAttachmentsInput";
 import { filesToMediaAttachments } from "@/lib/attachments/client";
 import { EVALUATION_RUN_COUNT } from "@/lib/evaluation/constants";
+import { SAMPLE_WORK_ITEMS } from "@/lib/sample-work-items";
 import RunUsageBanner from "@/components/RunUsageBanner";
 import { mergeUsageSummaries } from "@/lib/llm";
 import { UI_LLM_PROVIDERS, type UiLlmProviderId } from "@/lib/llm/types";
@@ -50,10 +51,94 @@ export default function Home() {
   const [loadingMode, setLoadingMode] = useState<"generate" | "evaluate" | null>(
     null
   );
+  const [activeAction, setActiveAction] = useState<
+    "report" | "report-and-evaluate" | null
+  >(null);
   const [error, setError] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [lastAttachments, setLastAttachments] = useState<MediaAttachment[]>([]);
+
+  function loadSample(sampleId: string) {
+    const sample = SAMPLE_WORK_ITEMS.find((item) => item.id === sampleId);
+    if (!sample) {
+      return;
+    }
+    setInput(sample.text);
+    setWorkItemType(sample.workItemType);
+    setValidationError(null);
+    setError(null);
+  }
+
+  async function runEvaluation(
+    analysisData: QAAnalysis,
+    originalWorkItem: string,
+    attachments: MediaAttachment[],
+    evalProvider: UiLlmProviderId,
+    previousUsage: LlmUsageSummary | null
+  ) {
+    setLoadingMode("evaluate");
+    const evalResponse = await fetch("/api/evaluate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        analysis: analysisData,
+        originalWorkItem,
+        provider: evalProvider,
+        attachments,
+      }),
+    });
+
+    let evalData: EvaluateSuccessResponse | EvaluateErrorResponse;
+    try {
+      evalData = (await evalResponse.json()) as
+        | EvaluateSuccessResponse
+        | EvaluateErrorResponse;
+    } catch {
+      throw new Error("Invalid evaluation response from server.");
+    }
+
+    if (!evalResponse.ok) {
+      const errorData = evalData as EvaluateErrorResponse;
+      throw new Error(errorData.error || "Evaluation failed.");
+    }
+
+    const evalSuccess = evalData as EvaluateSuccessResponse;
+    setEvaluation(evalSuccess.evaluation);
+    setEvaluationOriginalWorkItem(evalSuccess.originalWorkItem);
+    if (previousUsage && evalSuccess.usage) {
+      setRunUsage(mergeUsageSummaries(previousUsage, evalSuccess.usage));
+    } else {
+      setRunUsage(evalSuccess.usage ?? previousUsage ?? null);
+    }
+  }
+
+  async function handleEvaluate() {
+    if (!analysis || !evaluationOriginalWorkItem) {
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+
+    try {
+      await runEvaluation(
+        analysis,
+        evaluationOriginalWorkItem,
+        lastAttachments,
+        resultProvider ?? provider,
+        runUsage
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Something went wrong. Please try again."
+      );
+    } finally {
+      setLoading(false);
+      setLoadingMode(null);
+    }
+  }
 
   async function handleAnalyze(withEvaluation: boolean) {
     const trimmed = input.trim();
@@ -94,6 +179,7 @@ export default function Home() {
 
     setLoading(true);
     setLoadingMode("generate");
+    setActiveAction(withEvaluation ? "report-and-evaluate" : "report");
     setAnalysis(null);
     setResultProvider(null);
     setEvaluation(null);
@@ -145,41 +231,19 @@ export default function Home() {
       setResultProvider(successData.provider ?? provider);
       setRunUsage(successData.usage);
       setEvaluationOriginalWorkItem(analyzedWorkItem);
+      setLastAttachments(attachments);
 
       if (!withEvaluation) {
         return;
       }
 
-      setLoadingMode("evaluate");
-      const evalResponse = await fetch("/api/evaluate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          analysis: successData.analysis,
-          originalWorkItem: analyzedWorkItem,
-          provider,
-          attachments,
-        }),
-      });
-
-      let evalData: EvaluateSuccessResponse | EvaluateErrorResponse;
-      try {
-        evalData = (await evalResponse.json()) as
-          | EvaluateSuccessResponse
-          | EvaluateErrorResponse;
-      } catch {
-        throw new Error("Invalid evaluation response from server.");
-      }
-
-      if (!evalResponse.ok) {
-        const errorData = evalData as EvaluateErrorResponse;
-        throw new Error(errorData.error || "Evaluation failed.");
-      }
-
-      const evalSuccess = evalData as EvaluateSuccessResponse;
-      setEvaluation(evalSuccess.evaluation);
-      setEvaluationOriginalWorkItem(evalSuccess.originalWorkItem);
-      setRunUsage(mergeUsageSummaries(successData.usage, evalSuccess.usage));
+      await runEvaluation(
+        successData.analysis,
+        analyzedWorkItem,
+        attachments,
+        successData.provider ?? provider,
+        successData.usage ?? null
+      );
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Something went wrong. Please try again."
@@ -187,6 +251,7 @@ export default function Home() {
     } finally {
       setLoading(false);
       setLoadingMode(null);
+      setActiveAction(null);
     }
   }
 
@@ -261,6 +326,20 @@ export default function Home() {
         <label htmlFor="requirements" className="block text-sm font-medium text-slate-700">
           Work item / requirement input
         </label>
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <span className="text-xs text-slate-500">Try a sample:</span>
+          {SAMPLE_WORK_ITEMS.map((sample) => (
+            <button
+              key={sample.id}
+              type="button"
+              onClick={() => loadSample(sample.id)}
+              disabled={loading}
+              className="rounded-full border border-slate-300 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {sample.label}
+            </button>
+          ))}
+        </div>
         <textarea
           id="requirements"
           value={input}
@@ -296,9 +375,9 @@ export default function Home() {
             disabled={loading}
             className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {loading && loadingMode === "generate"
+            {loading && activeAction === "report"
               ? "Generating report…"
-              : "Analyze"}
+              : "Generate report"}
           </button>
           <button
             type="button"
@@ -306,18 +385,15 @@ export default function Home() {
             disabled={loading}
             className="inline-flex items-center justify-center rounded-lg bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {loading && loadingMode === "evaluate"
-              ? "Evaluating output…"
-              : loading && loadingMode === "generate"
+            {loading && activeAction === "report-and-evaluate" && loadingMode === "evaluate"
+              ? "Evaluating quality…"
+              : loading && activeAction === "report-and-evaluate"
                 ? "Generating report…"
-                : "Analyze & evaluate"}
+                : "Generate + evaluate"}
           </button>
         </div>
         <p className="text-xs text-slate-500">
-          <span className="font-medium text-slate-600">Analyze</span> — 1 LLM call
-          (report only).{" "}
-          <span className="font-medium text-slate-600">Analyze &amp; evaluate</span>{" "}
-          — {1 + EVALUATION_RUN_COUNT} LLM calls (report + quality scores).
+          Evaluation uses 2 extra AI calls.
         </p>
 
         {loading && (
@@ -331,14 +407,34 @@ export default function Home() {
 
       {analysis && (
         <div className="mt-8">
-          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-xl font-semibold text-slate-900">Test design report</h2>
-            {resultProvider && (
-              <span className="text-sm text-slate-500">
-                Generated with {PROVIDER_LABELS[resultProvider]}
-              </span>
-            )}
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-baseline gap-2">
+              <h2 className="text-xl font-semibold text-slate-900">Test design report</h2>
+              {resultProvider && (
+                <span className="text-sm text-slate-500">
+                  Generated with {PROVIDER_LABELS[resultProvider]}
+                </span>
+              )}
+            </div>
+            {!evaluation ? (
+              <button
+                type="button"
+                onClick={handleEvaluate}
+                disabled={loading}
+                className="inline-flex items-center justify-center rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {loadingMode === "evaluate"
+                  ? "Evaluating quality…"
+                  : "Evaluate quality"}
+              </button>
+            ) : null}
           </div>
+          {!evaluation ? (
+            <p className="mb-4 text-xs text-slate-500">
+              Optional: run AI quality evaluation ({EVALUATION_RUN_COUNT} LLM calls) to
+              score coverage, accuracy, and gaps.
+            </p>
+          ) : null}
           {runUsage ? <RunUsageBanner usage={runUsage} /> : null}
           <AnalysisResults
             analysis={analysis}

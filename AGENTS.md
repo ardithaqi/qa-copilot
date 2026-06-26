@@ -3,7 +3,7 @@
 > **For AI agents and new chat sessions:** Read this file first. It describes the real codebase as of the last update below.  
 > **For humans:** Paste into a new Cursor chat: *“Read `AGENTS.md` in this workspace and continue from there.”*
 
-**Last updated:** 2026-06-16  
+**Last updated:** 2026-06-26  
 **Repo:** [github.com/ardithaqi/qa-copilot](https://github.com/ardithaqi/qa-copilot) (public)  
 **Workspace path:** local clone path may differ (e.g. `qa-copilot` on disk)  
 **Do not use:** old copies under `Desktop/oleaburger/` or other stale clones — this tree is the canonical standalone repo
@@ -200,10 +200,10 @@ Only the key for the **selected provider** must be set for that run. For product
 1. **Work item type** (radio, default **Auto-detect**):
    - `auto` | `feature` | `bug` | `enhancement` | `technical_change`
 2. **AI provider** (radio): `groq` | `openai` | `gemini`
-3. **Textarea** — requirement / ticket text  
+3. **Textarea** — requirement / ticket text; **Try a sample** chips load example tickets (password reset, checkout bug, API rate limit) and set work item type  
 4. **Screenshots or video (optional)** — up to 3 images or 1 video; sent as base64 with analyze/evaluate requests  
-5. **Analyze** — generate report only (1 LLM call)  
-6. **Analyze & evaluate** — generate + quality evaluation (3 LLM calls)  
+5. **Generate report** — report only (1 LLM call); **Evaluate quality** on the report afterward (2 extra calls)  
+6. **Generate + evaluate** — report + quality evaluation in one go (3 LLM calls)  
 
 **Media provider support:** Groq — text only (client blocks attachments). OpenAI — images. Gemini — images and video.
 
@@ -505,6 +505,9 @@ Use this section for future work; remove items when done and note in Changelog.
 
 | Date | Change |
 | ---- | ------ |
+| 2026-06-26 | **Button labels:** Generate report / Generate + evaluate; help text on evaluation cost. |
+| 2026-06-26 | **Evaluate later:** Evaluate quality button on report after Analyze-only (`runEvaluation` in `page.tsx`). **Sample tickets** + **Copy test case** (see prior entry). |
+| 2026-06-26 | **Sample tickets:** Try a sample chips on input (`src/lib/sample-work-items.ts`). **Copy test case:** per-card Copy button exports markdown (`formatTestCaseAsMarkdown`, `TestCaseCard`, `CopyButton`). |
 | 2026-06-03 | **Streamlined report UI:** risks, grouped test cases, automation, Playwright, API (when relevant), final notes; hide work item type, summary, business rules, missing-info. |
 | 2026-06-03 | **Optional media:** screenshots (OpenAI/Gemini) or video (Gemini); `MediaAttachmentsInput`, `src/lib/attachments/`, multimodal LLM wiring. |
 | 2026-06-03 | **Usage UI:** collapsible Usage details after runs; server `logUsageSummary` for operators. |
